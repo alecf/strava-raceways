@@ -1,0 +1,53 @@
+{% macro athlete_profile(profile) -%}
+<div>
+    <img width=62 height=62 src="{{profile.profile_medium}}">
+    <div class="athlete-name">{{ profile.firstname }} {{ profile.lastname }} <span class="email">{{profile.email}}</span></div>
+    <div class="athlete-location">{{ profile.city }}, {{profile.state}}, {{ profile.country }}</div>
+    <div class="athlete-joined">Joined {{ profile.created_at }}</div>
+    <div class="athlete-friends">{{profile.friend_count}} friends, {{profile.follower_count}} followers</div>
+    <div class="athlete-bikes">
+        <ul>
+            {% for bike in profile.bikes %}
+            <li>{{bike.name}} ({{bike.distance}} ft)</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{%- endmacro %}
+<html>
+    <head>
+<title>Strava Raceways</title>
+</head>
+<body>
+<h1>Strava Raceways</h1>
+
+{% if user %}
+<div>
+    <div>
+    User credentials:
+    <ul>
+        <li>Nickname: {{user.nickname()}}</li>
+        <li>Email: {{user.email()}}</li>
+        <li>userid: {{user.user_id()}}</li>
+        <li>federated: {{user.federated_identity()}}</li>
+        <li>federated provider: {{user.federated_provider()}}</li>
+    </ul>
+    You can <a href="{{logout_url}}">Log out</a> at any time.
+    </div>
+    
+    {% if strava_credentials %}
+    {{ athlete_profile(athlete) }}
+    <h2>Activities:</h2>
+    <pre>{{json.dumps(activities, indent=4)}}</pre>
+
+    <h2>Sample stream:</h2>
+    <pre>{{json.dumps(stream, indent=4)}}</pre>
+    {% else %}
+    <a href="{{strava_login_url}}"><img width=172 height=31 border=0 src="http://strava.github.io/api/images/ConnectWithStrava.png"></a>
+    {% endif %}
+</div>
+{% else %}
+<a href="{{login_url}}">Log in to Google</a> to begin.
+{% endif %}
+</body>
+</html>

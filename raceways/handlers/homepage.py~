@@ -1,0 +1,41 @@
+
+
+class MainHandler(BaseHandler):
+    def get(self):
+        # basic user login
+        strava_auth_uri = None
+        if self.user:
+            # store strava auth in session (eventually want to store this
+            # along side the user!)
+            strava_credentials = self.strava_storage.get()
+            if not strava_credentials:
+                strava_auth_uri = self.strava_flow.step1_get_authorize_url()
+
+            else:
+                strava_credentials.authorize(self.http)
+        else:
+            strava_credentials = None
+
+        template = JINJA_ENVIRONMENT.get_template('index.html')
+
+        strava_credentials_json = {}
+        if strava_credentials:
+            strava_credentials_json = json.loads(strava_credentials.to_json())
+            print json.dumps(strava_credentials_json, indent=4)
+        else:
+            athlete = None
+            activities = []
+            stream = []
+
+        template_values = {
+            'strava_credentials': strava_credentials_json,
+            'strava_login_url': strava_auth_uri,
+            'logout_url': users.create_logout_url('/'),
+            'login_url': users.create_login_url('/'),
+            'user': self.user,
+
+            # modules
+            'unithelper': unithelper,
+            'json': json,
+            }
+        self.response.write(template.render(template_values))

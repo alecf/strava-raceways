@@ -1,0 +1,16 @@
+{% macro athlete_profile(profile) -%}
+<div>
+    <img width=62 height=62 src="{{profile.profile_medium}}">
+    <div class="athlete-name">{{ profile.firstname }} {{ profile.lastname }} <span class="email">{{profile.email}}</span></div>
+    <div class="athlete-location">{{ profile.city }}, {{profile.state}}, {{ profile.country }}</div>
+    <div class="athlete-joined">Joined {{ profile.created_at }}</div>
+    <div class="athlete-friends">{{profile.friend_count}} friends, {{profile.follower_count}} followers</div>
+    <div class="athlete-bikes">
+        <ul>
+            {% for bike in profile.bikes %}
+            <li>{{bike.name}} ({{bike.distance}} ft)</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{%- endmacro %}

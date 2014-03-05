@@ -1,0 +1,8 @@
+
+# much of this stolen from stravalib
+import pytz
+
+def reformat_date(datestring, source, athlete):
+    timezone = source['timezone'].split(' ')[-1]
+    tzinfo = pytz.timezone(timezone)
+    date = datetime.strptime(datetime.strptime(v, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=tzinfo))

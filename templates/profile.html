@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock%}
+{% block content %}
+Profile.
+{{util.athlete_profile(athlete)}}
+
+<ul>
+{% for activity in activities %}
+  <li>{{activity.name}} ({{formats.reformat_date(activity['start_date'], activity, athlete)}})
+      (<a href="/map?id={{activity.id}}">map</a>, <a href="http://www.strava.com/activities/{{activity.id}}">strava</a>)
+      {#<pre>{{json.dumps(activity, indent=4, sort_keys=True)}}</pre>#}
+  </li>
+{% endfor %}
+</ul>
+<pre>Athlete: {{json.dumps(athlete, indent=4, sort_keys=True)}}</pre>
+{% endblock %}

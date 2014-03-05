@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock%}
+{% block content %}
+<h1>Strava Raceways</h1>
+
+{% if user %}
+<div>
+    <div>
+    User credentials:
+    <ul>
+        <li>Nickname: {{user.nickname()}}</li>
+        <li>Email: {{user.email()}}</li>
+        <li>userid: {{user.user_id()}}</li>
+        <li>federated: {{user.federated_identity()}}</li>
+        <li>federated provider: {{user.federated_provider()}}</li>
+    </ul>
+    You can <a href="{{logout_url}}">Log out</a> at any time.
+    </div>
+    
+    {% if strava_credentials %}
+    You are connected with Strava:
+    {{util.athlete_profile(strava_credentials.token_response.athlete)}}
+    
+    {% else %}
+    <a href="{{strava_login_url}}"><img width=172 height=31 border=0 src="http://strava.github.io/api/images/ConnectWithStrava.png"></a>
+    {% endif %}
+</div>
+{% else %}
+<a href="{{login_url}}">Log in to Google</a> to begin.
+{% endif %}
+{% endblock %}

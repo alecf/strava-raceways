@@ -1,0 +1,19 @@
+
+
+import json
+
+def jsonresponse(f):
+    def reply(*args, **kwds):
+        header, body = f(*args, **kwds)
+        body = json.loads(body)
+        
+    return reply
+
+class StravaClient(object):
+    def __init__(self, http):
+        self.http = http
+
+    @jsonresponse
+    def athlete(self, id=None):
+        
+        
