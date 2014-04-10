@@ -18,7 +18,7 @@
     </div>
     
     {% if strava_credentials %}
-    You are connected with Strava:
+    You are connected with Strava.
     {{util.athlete_profile(strava_credentials.token_response.athlete)}}
     
     {% else %}

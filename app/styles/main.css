@@ -27,3 +27,25 @@ body {
     color: #000;
     padding: 0.2em 0;
 }
+
+.map-ui {
+    padding: 3px;
+}
+
+ul.activity-list {
+    padding-left: 0;
+}
+
+ul.activity-list li {
+    list-style-type: none;
+    font-size: small;
+}
+
+div.athlete {
+    float: right;
+    font-size: small;
+    background-color: #fff;
+    border-radius: 3px;
+    margin: 10px;
+    padding: 5px;
+}

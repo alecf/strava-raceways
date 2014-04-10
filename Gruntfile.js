@@ -31,11 +31,6 @@ module.exports = function (grunt) {
                 livereload: true
             },
         
-            compass: {
-                files: ['<%= yeoman.app %>/styles/{,*/}*.{scss,sass}'],
-                tasks: ['compass']
-            },
-            
             livereload: {
                 options: {
                     livereload: LIVERELOAD_PORT
@@ -116,24 +111,6 @@ module.exports = function (grunt) {
             }
         },
     
-        compass: {
-            options: {
-                sassDir: '<%= yeoman.app %>/styles',
-                cssDir: '.tmp/styles',
-                imagesDir: '<%= yeoman.app %>/images',
-                javascriptsDir: '<%= yeoman.app %>/scripts',
-                fontsDir: '<%= yeoman.app %>/styles/fonts',
-                importPath: '<%= yeoman.app %>/bower_components',
-                relativeAssets: true
-            },
-            dist: {},
-            server: {
-                options: {
-                    debugInfo: true
-                }
-            }
-        },
-        
         useminPrepare: {
             html: '<%= yeoman.app %>/index.html',
             options: {
@@ -232,7 +209,7 @@ module.exports = function (grunt) {
 
         grunt.task.run([
             'clean:server',
-            'compass:server',
+            
             'connect:livereload',
             'copy',
             'open',
@@ -243,8 +220,6 @@ module.exports = function (grunt) {
     grunt.registerTask('test', [
         'clean:server',
         
-        'compass',
-        
         
         'connect:test',
         'mocha'
@@ -252,7 +227,7 @@ module.exports = function (grunt) {
 
     grunt.registerTask('build', [
         'clean:dist',
-        'compass:dist',
+        
         'vulcanize',
         'useminPrepare',
         'imagemin',

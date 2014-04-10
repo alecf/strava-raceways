@@ -9,9 +9,29 @@ handlers:
   static_files: favicon.ico
   upload: favicon\.ico
 
+# yeoman stuff
+- url: /styles
+  static_dir: app/styles
+- url: /images
+  static_dir: app/images
+- url: /scripts
+  static_dir: app/scripts
+- url: /bower_components
+  static_dir: app/bower_components
+- url: /elements
+  static_dir: app/elements
+- url: /index
+  static_files: app/index.html
+  upload: app/index\.html
+- url: /404
+  static_files: app/404.html
+  upload: app/404\.html
+
 - url: .*
   script: main.app
 
 libraries:
 - name: webapp2
   version: "2.5.2"
+- name: jinja2
+  version: "2.6"
