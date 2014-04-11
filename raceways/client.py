@@ -4,6 +4,7 @@ import json
 from functools import wraps
 import time
 from raceways.model import Athlete, Stream
+from google.appengine.ext import ndb
 
 def jsonresponse(f):
     @wraps(f)
@@ -31,7 +32,28 @@ def api_call(name, *url_segments, **params):
     return url
 
 KEY_VERSION = 1
+
+
 def entity(ModelClass, subkey=None):
+    """
+    A decorator that says to cache the result of this call in a
+    ModelClass instance.
+
+    Usage::
+
+    @entity(MyModel)
+    def LookUpMyModel(self, query):
+        return find_my_model(query)
+
+    (This feature still needs work)
+    If the response should be additionally keyed by a particular
+    subkey that shows up in the response object::
+
+    @entity(MyModel, subkey='name')
+    def LookUpMyModelByName(self, name=None):
+        return find_my_model_by_name(name)
+    
+    """
     def decorator(f):
         f.model_class = ModelClass
         @wraps(f)
