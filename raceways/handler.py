@@ -6,6 +6,9 @@ from functools import wraps
 import time
 import json
 
+# for async context
+from google.appengine.ext import ndb
+
 
 from google.appengine.api import users, memcache
 from oauth2client.appengine import StorageByKeyName
@@ -86,11 +89,67 @@ def authorized(f):
             print "Redirecting..."
             return self.redirect('/')
         strava_credentials = self.strava_storage.get()
-        
+        self.arq = AuthRequestContext(strava_credentials)
+
+        # eventually hope to remove this part!
         strava_credentials.authorize(self.http)
         return f(self, *args, **kwds)
     return wrapper
 
+class AuthRequestContext(object):
+    """
+    Perform asynchronous requests to a given url given a set of
+    credentials. Makes sure that only one refresh is happening at a
+    time.
+    """
+    def __init__(self, credentials):
+        self.credentials = credentials
+        self.request_futures = set()
+
+    @ndb.tasklet
+    def _urlfetch(self, url, **kwds):
+        """
+        Same semantics as _urlfetch except that it stores the futures for later
+        """
+        ctx = ndb.get_context()
+        future = ctx.urlfetch(url, **kwds)
+        self.request_futures.add(future)
+        result = yield future
+        self.request_futures.remove(future)
+        raise ndb.Return(result)
+
+    @ndb.tasklet
+    def urlfetch(self, url, headers=None, **kwds):
+        if headers is None:
+            headers = {}
+
+        assert headers.access_token
+        credentials.apply(headers)
+
+        result = yield self._urlfetch(url, headers=headers, **kwds)
+
+        if result.status_code == 401:
+
+            if self.request_futures:
+                # if there are other outstanding futures, then one of
+                # them will refresh for us?
+                yield self.request_futures
+            else:
+                # ok we're the only outstanding request, we are
+                # responsible for the refresh
+                
+
+                # ugly, using sync HTTP for this part, because the
+                # code in OAuth2Credentials.refresh is too complicated
+                # to copy here right now
+                clean_http = httplib2.Http(memcache)
+                credentials.refresh(clean_http) # failure?
+                
+            credentials.apply(headers)
+            result = yield self._urlfetch(url, headers=headers, **kwds)
+
+        raise ndb.Return(result)
+        
 class BaseHandler(webapp2.RequestHandler):
     def dispatch(self):
         self.deadline = time.time() + 58        # 60 seconds plus buffer
