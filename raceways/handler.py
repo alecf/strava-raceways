@@ -89,10 +89,10 @@ def authorized(f):
             print "Redirecting..."
             return self.redirect('/')
         strava_credentials = self.strava_storage.get()
-        self.arq = AuthRequestContext(strava_credentials)
 
         # eventually hope to remove this part!
         strava_credentials.authorize(self.http)
+        self.arc = AuthRequestContext(strava_credentials)
         return f(self, *args, **kwds)
     return wrapper
 
@@ -123,8 +123,7 @@ class AuthRequestContext(object):
         if headers is None:
             headers = {}
 
-        assert headers.access_token
-        credentials.apply(headers)
+        self.credentials.apply(headers)
 
         result = yield self._urlfetch(url, headers=headers, **kwds)
 

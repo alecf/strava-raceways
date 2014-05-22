@@ -106,6 +106,7 @@ class StravaClient(object):
     def athlete_activities(self, id=None, before=None, after=None, page=None, per_page=None):
         return self.http.request(api_call('athlete/activities', id=id, before=before, after=after, page=page, per_page=per_page))
 
+
     @entity(Stream, subkey='type')
     def activity_stream(self, id=None, type=None, resolution=None, series_type=None):
         return self.http.request(api_call('activities', str(id), 'streams', type,

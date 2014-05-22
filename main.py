@@ -26,6 +26,7 @@ from raceways.handler import BaseHandler
 from raceways.handlers.login import LoginHandler
 from raceways.handlers.homepage import HomepageHandler
 from raceways.handlers.profile import ProfileHandler
+from raceways.handlers.update import UpdateHandler
 from raceways.api import ActivityListHandler,StreamHandler
 
 from stravalib.client import Client
@@ -51,6 +52,7 @@ app = webapp2.WSGIApplication([
     ('/login', LoginHandler),
     #('/activities', ActivitiesHandler),
     ('/profile', ProfileHandler),
+    ('/api/update', UpdateHandler),
     ('/api/activities', ActivityListHandler),
     ('/api/streams', ActivityListHandler),
     ],
