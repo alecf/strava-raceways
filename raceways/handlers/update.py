@@ -63,7 +63,6 @@ class UpdateHandler(BaseHandler):
             pending_writes.append(activity_record.put_async())
 
         while pending_stream_requests:
-            print "{} outstanding streams..".format(len(pending_stream_requests))
             f = ndb.Future.wait_any(pending_stream_requests)
             pos = pending_stream_requests.index(f)
             pending_stream_requests.remove(f)
