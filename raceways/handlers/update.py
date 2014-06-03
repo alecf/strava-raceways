@@ -3,7 +3,7 @@ API_PREFIX = 'https://www.strava.com/api/v3/'
 
 from raceways import model
 from raceways.client import api_call
-from raceways.handler import BaseHandler, authorized
+from raceways.handler import BaseHandler, authorized, api_handler
 from google.appengine.ext import ndb
 import json
 import itertools
@@ -15,58 +15,63 @@ def pairwise(iterable):
     next(b, None)
     return itertools.izip(a, b)
 
+
+@ndb.tasklet
+def load_activities(activity_ids):
+    pending_keys = []
+    for activity_id in activity_ids:
+        pending_keys.append(ndb.Key(model.Activity, activity_id))
+
+    result = (pending_keys, ndb.get_multi_async(pending_keys))
+    raise ndb.Return(result)
+
 class UpdateHandler(BaseHandler):
 
     @authorized
+    @api_handler
     @ndb.toplevel
     def get(self):
-
+        result = {
+            'activities': []
+            }
         athlete_id = self.get_athlete()['id']
 
         athlete = model.Athlete.get_by_id(id=athlete_id)
 
-        activities = yield self.arc.urlfetch(api_call('athlete/activities', id=athlete_id, per_page=20))
+        activities = yield self.arc.urlfetch(api_call('athlete/activities', id=athlete_id, per_page=10))
 
         strava_activities = json.loads(activities.content)
+        result['total_activities'] = len(strava_activities)
+        pending_keys, activity_records = yield load_activities([activity['id'] for activity in strava_activities])
 
-        import pprint
-
-        pending_keys = []
-        for activity in strava_activities:
-            activity_id = activity['id']
-            pending_keys.append(ndb.Key(model.Activity, str(activity_id)))
-
-        activity_records = yield ndb.get_multi_async(pending_keys)
-
-        self.response.write("Fetch complete with {} activities<br>".format(len(activity_records)))
-        for activity_record in activity_records:
-            self.response.write("Activity: <pre>{}</pre><br>".format(activity))
+        activity_records = yield activity_records
         missing_activities = [(key, strava_activity)
                               for key, strava_activity, record in itertools.izip(pending_keys,
-                                                                           strava_activities,
-                                                                           activity_records)
+                                                                                 strava_activities,
+                                                                                 activity_records)
                               if record is None]
         pending_writes = []
 
-        pending_stream_requests = []
-        pending_stream_request_map = []
-        pending_activity_requests = []
+        # Map of future -> activity_id
+        pending_stream_requests = {}
         for missing_key, strava_activity in missing_activities:
-            self.response.write("Missing: {}<br>".format(missing_key.id()))
             f = self.arc.urlfetch(api_call('activities/{}/streams/latlng,altitude'.format(missing_key.id())))
-            pending_stream_requests.append(f)
-            pending_stream_request_map.append(missing_key.id())
+            pending_stream_requests[f] = missing_key.id()
 
             activity_record = model.Activity(id=missing_key.id())
             for key, value in strava_activity.iteritems():
                 setattr(activity_record, key, value)
+            activity_record.athlete_id = strava_activity['athlete']['id']
+            activity_record.activity_id = strava_activity['id']
+            
+            result['activities'].append(strava_activity)
             pending_writes.append(activity_record.put_async())
 
         while pending_stream_requests:
-            f = ndb.Future.wait_any(pending_stream_requests)
-            pos = pending_stream_requests.index(f)
-            pending_stream_requests.remove(f)
-            activity_id = pending_stream_request_map.pop(pos)
+            f = ndb.Future.wait_any(pending_stream_requests.keys())
+            print "Have stream.."
+            activity_id = pending_stream_requests[f]
+            del pending_stream_requests[f]
             
             streams = json.loads(f.get_result().content)
 
@@ -80,7 +85,7 @@ class UpdateHandler(BaseHandler):
 
                 pending_writes.append(stream_record.put_async())
 
-        print "Waiting for {} writes to finish..".format(len(pending_writes))
+        print "Awaiting {} writes...".format(len(pending_writes))
         yield pending_writes
 
-        raise ndb.Return(None)
+        raise ndb.Return(result)

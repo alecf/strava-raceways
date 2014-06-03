@@ -5,6 +5,7 @@ from stravalib import unithelper
 from functools import wraps
 import time
 import json
+import traceback
 
 # for async context
 from google.appengine.ext import ndb
@@ -72,13 +73,15 @@ def api_handler(f):
                 "status": "SUCCESS",
                 }
         except Exception as e:
+            tb = traceback.format_exc()
             envelope = {
                 "result": "ERROR",
-                "messages": [str(e)]
+                "messages": [str(e)],
+                "traceback": tb.split('\n')
                 }
         print "wrapper done"
             
-        self.response.write(json.encode(envelope, indent=4, default=json_default_encode))
+        self.response.write(json.dumps(envelope, indent=4, default=json_default_encode))
         
     return wrapper
 

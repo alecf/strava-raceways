@@ -42,7 +42,9 @@ class Athlete(ndb.Model):
 class Activity(ndb.Model):
     resource_state = ndb.IntegerProperty()  # indicates level of detail
     external_id = ndb.StringProperty()  # provided at upload
-    athlete = ndb.JsonProperty() # meta or summary representation of the athlete
+    activity_id = ndb.IntegerProperty()
+    #athlete = ndb.JsonProperty() # meta or summary representation of the athlete
+    athlete_id = ndb.IntegerProperty()
     name = ndb.StringProperty()
     distance = ndb.FloatProperty() # meters
     moving_time = ndb.IntegerProperty() # seconds
@@ -89,6 +91,7 @@ class Activity(ndb.Model):
 class Stream(ndb.Model):
     type = ndb.StringProperty()
     data = ndb.JsonProperty(repeated=True)
+    activity_id = ndb.IntegerProperty()  # not used right now, this is embedded in the id
     series_type = ndb.StringProperty()
     original_size = ndb.IntegerProperty()
     resolution = ndb.StringProperty()   # low, medium or high
