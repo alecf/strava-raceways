@@ -35,10 +35,15 @@ class UpdateHandler(BaseHandler):
             'activities': []
             }
         athlete_id = self.get_athlete()['id']
+        per_page = self.request.get('count', 10)
+        try:
+            per_page = int(per_page)
+        except ValueError as e:
+            per_page = 10
 
         athlete = model.Athlete.get_by_id(id=athlete_id)
 
-        activities = yield self.arc.urlfetch(api_call('athlete/activities', id=athlete_id, per_page=10))
+        activities = yield self.arc.urlfetch(api_call('athlete/activities', id=athlete_id, per_page=per_page))
 
         strava_activities = json.loads(activities.content)
         result['total_activities'] = len(strava_activities)
