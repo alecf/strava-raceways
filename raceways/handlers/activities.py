@@ -38,6 +38,9 @@ class ActivitiesHandler(BaseHandler):
         streams = yield ndb.get_multi_async(ndb.Key(model.Stream, stream_key) for stream_key in stream_keys)
 
         for stream_key, stream_type, stream in zip(stream_keys, stream_types, streams):
-            activity_streams[stream_key]['stream_{}'.format(stream_type)] = stream.to_dict()
+            if stream is None:
+                activity_streams[stream_key]['stream_{}'.format(stream_type)] = []
+            else:
+                activity_streams[stream_key]['stream_{}'.format(stream_type)] = stream.to_dict()
 
         raise ndb.Return(result)
