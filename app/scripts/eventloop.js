@@ -24,7 +24,7 @@ Object.defineProperty(EventLoop.prototype,
                                              this.schedule(); }
                       });
 
-EventLoop.prototype.tick() = function() {
+EventLoop.prototype.tick = function() {
     var callbacks = this._callbacks.splice(0, this._callbacks.length);
     for (var i = 0; i < callbacks.length; ++i) {
         var f = callbacks[i];
