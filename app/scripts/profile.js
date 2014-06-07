@@ -16,9 +16,9 @@ function index_streams(activities) {
             continue;
         var alt_stream = activities[i].stream.altitude;
 
-        metadata.domain.lat = domain_of(latlng_stream.data, accessor(0));
-        metadata.domain.lng = domain_of(latlng_stream.data, accessor(1));
-        metadata.domain.alt = domain_of(alt_stream.data, function(d) { return d });
+        metadata.domain.lat = d3.extent(latlng_stream.data, accessor(0));
+        metadata.domain.lng = d3.extent(latlng_stream.data, accessor(1));
+        metadata.domain.alt = d3.extent(alt_stream.data);
     }
     return results;
 }
@@ -29,25 +29,17 @@ function accessor(attr) {
     };
 }
 
-function domain_of(data, getter) {
-    if (!data)
-        console.trace("Missing data: ", data);
-    var min = Math.min.apply(Math, data.map(getter));
-    var max = Math.max.apply(Math, data.map(getter));
-    return [min, max];
-}
-
 // an object that represents the bounds of a map
 // note that there is no projection here
 function Bounds(stream_index) {
     console.log("Got index: ", stream_index);
     var extents = {
-        min_lat: domain_of(stream_index, function(d) { return d.domain.lat[0]; })[0],
-        max_lat: domain_of(stream_index, function(d) { return d.domain.lat[1]; })[1],
-        min_lng: domain_of(stream_index, function(d) { return d.domain.lng[0]; })[0],
-        max_lng: domain_of(stream_index, function(d) { return d.domain.lng[1]; })[1],
-        min_alt: domain_of(stream_index, function(d) { return d.domain.alt[0]; })[0],
-        max_alt: domain_of(stream_index, function(d) { return d.domain.alt[1]; })[1],
+        min_lat: d3.extent(stream_index, function(d) { return d.domain.lat[0]; })[0],
+        max_lat: d3.extent(stream_index, function(d) { return d.domain.lat[1]; })[1],
+        min_lng: d3.extent(stream_index, function(d) { return d.domain.lng[0]; })[0],
+        max_lng: d3.extent(stream_index, function(d) { return d.domain.lng[1]; })[1],
+        min_alt: d3.extent(stream_index, function(d) { return d.domain.alt[0]; })[0],
+        max_alt: d3.extent(stream_index, function(d) { return d.domain.alt[1]; })[1],
     };
     console.log("Now have extents.domain = ", extents);
 
@@ -292,10 +284,6 @@ function refresh() {
 }
 
 function init() {
-    // hack to filter out activities from other towns
-    //var city = activities[0].location_city;
-    //activities = activities.filter(function(activity) { return activity.location_city == city; });
-
     refresh();
 
     var controls = document.querySelectorAll('.map-control > polymer-ui-tabs');
@@ -306,7 +294,6 @@ function init() {
         }
     }
 }
-
 // hack hack
 if (document.readyState == "complete") {
     init();
