@@ -31,16 +31,21 @@ class ActivitiesHandler(BaseHandler):
                 if 'athlete_id' not in activity:
                     raise Exception("missing id from {}".format(sorted(activity.keys())))
                 stream_key = '{}|v=2|type={}'.format(activity['activity_id'], type)
+                print "Looking for {}".format(stream_key)
                 stream_types.append(type)
                 activity_streams[stream_key] = activity
                 stream_keys.append(stream_key)
 
         streams = yield ndb.get_multi_async(ndb.Key(model.Stream, stream_key) for stream_key in stream_keys)
+        print "Have {} streams ({} not none)!".format(len(streams), len([s for s in streams if s is not None]))
 
         for stream_key, stream_type, stream in zip(stream_keys, stream_types, streams):
+            activity = activity_streams[stream_key]
+            if 'stream' not in activity:
+                activity['stream'] = {}
             if stream is None:
-                activity_streams[stream_key]['stream_{}'.format(stream_type)] = []
+                activity['stream'][stream_type] = ['missing']
             else:
-                activity_streams[stream_key]['stream_{}'.format(stream_type)] = stream.to_dict()
+                activity['stream'][stream_type] = stream.to_dict()
 
         raise ndb.Return(result)

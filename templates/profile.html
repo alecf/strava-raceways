@@ -13,9 +13,11 @@
     <div class="map-control map-location" properties='["location_city","location_state","location_country"]'>Location:
         <polymer-ui-tabs valueattr="value" selected="*">
             <span class="tab" value="*">All</span>
+            {#
             {% for location in locations -%}
             <span class="tab" value='{{json.dumps(location)|safe}}'>{{location[0]}}</span>
             {% endfor %}
+            #}
         </polymer-ui-tabs>
     </div>
     <div>
@@ -23,21 +25,20 @@
     </div>
 </div>
 <ul class="activity-list">
+    {#
 {% for activity in activities %}
   <li>{{activity.name}} - {{formats.reformat_date(activity['start_date'], activity, athlete)}} ({{activity.type}},
       <a href="/map?id={{activity.id}}">map</a>, <a href="http://www.strava.com/activities/{{activity.id}}">strava</a>) {{activity.distance}} meters.
       {% if activity.gear_id-%}[{{activity.gear_id}}]{% endif %}
-      {#<pre>{{json.dumps(activity, indent=4, sort_keys=True)}}</pre>#}
   </li>
 {% endfor %}
+  #}
 </ul>
 <script type="text/javascript" defer async>
-    var activities = {{json.dumps(activities)|safe}};
-    var locations = {{json.dumps(locations)|safe}};
     var athlete = {{json.dumps(athlete, indent=4, sort_keys=True)|safe}}
 </script>
 <script src="/scripts/eventloop.js" async></script>
 <script src="/scripts/profile.js" async></script>
-<script src="//cdnjs.cloudflare.com/ajax/libs/d3/3.4.2/d3.min.js"></script>
-<script src="//d3js.org/colorbrewer.v1.min.js"></script>
+<script src="/scripts/third_party/d3.v3.min.js"></script>
+<script src="/scripts/third_party/colorbrewer.js"></script>
 {% endblock %}

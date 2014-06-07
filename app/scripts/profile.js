@@ -7,7 +7,7 @@ function index_streams(activities) {
         if (!activities[i].stream)
             continue;
 
-        var metadata = {};
+        var metadata = {domain: {}};
         results.push(metadata);
 
         var latlng_stream = activities[i].stream.latlng;
@@ -16,38 +16,40 @@ function index_streams(activities) {
             continue;
         var alt_stream = activities[i].stream.altitude;
 
-        function lat(data) { return data[0]; }
-        function lng(data) { return data[1]; }
-        metadata.min_lat = Math.min.apply(Math, latlng_stream.data.map(lat));
-        metadata.min_lng = Math.min.apply(Math, latlng_stream.data.map(lng));
-        metadata.max_lat = Math.max.apply(Math, latlng_stream.data.map(lat));
-        metadata.max_lng = Math.max.apply(Math, latlng_stream.data.map(lng));
-        metadata.min_alt = Math.min.apply(Math, alt_stream.data);
-        metadata.max_alt = Math.max.apply(Math, alt_stream.data);
+        metadata.domain.lat = domain_of(latlng_stream.data, accessor(0));
+        metadata.domain.lng = domain_of(latlng_stream.data, accessor(1));
+        metadata.domain.alt = domain_of(alt_stream.data, function(d) { return d });
     }
-
     return results;
+}
+
+function accessor(attr) {
+    return function(d, i) {
+        return d[attr];
+    };
+}
+
+function domain_of(data, getter) {
+    if (!data)
+        console.trace("Missing data: ", data);
+    var min = Math.min.apply(Math, data.map(getter));
+    var max = Math.max.apply(Math, data.map(getter));
+    return [min, max];
 }
 
 // an object that represents the bounds of a map
 // note that there is no projection here
 function Bounds(stream_index) {
-    function min_lat(data) { return data.min_lat; }
-    function min_lng(data) { return data.min_lng; }
-    function max_lat(data) { return data.max_lat; }
-    function max_lng(data) { return data.max_lng; }
-
-    function min_alt(data) { return data.min_alt; }
-    function max_alt(data) { return data.max_alt; }
+    console.log("Got index: ", stream_index);
     var extents = {
-        min_lat: Math.min.apply(Math, stream_index.map(min_lat)),
-        min_lng: Math.min.apply(Math, stream_index.map(min_lng)),
-        max_lat: Math.max.apply(Math, stream_index.map(max_lat)),
-        max_lng: Math.max.apply(Math, stream_index.map(max_lng)),
-
-        min_alt: Math.min.apply(Math, stream_index.map(min_alt)),
-        max_alt: Math.max.apply(Math, stream_index.map(max_alt)),
+        min_lat: domain_of(stream_index, function(d) { return d.domain.lat[0]; })[0],
+        max_lat: domain_of(stream_index, function(d) { return d.domain.lat[1]; })[1],
+        min_lng: domain_of(stream_index, function(d) { return d.domain.lng[0]; })[0],
+        max_lng: domain_of(stream_index, function(d) { return d.domain.lng[1]; })[1],
+        min_alt: domain_of(stream_index, function(d) { return d.domain.alt[0]; })[0],
+        max_alt: domain_of(stream_index, function(d) { return d.domain.alt[1]; })[1],
     };
+    console.log("Now have extents.domain = ", extents);
 
     var padding_x = (extents.max_lng - extents.min_lng) * 0.1;
     var padding_y = (extents.max_lat - extents.min_lat) * 0.1;
@@ -276,9 +278,17 @@ function sum(values) {
 
 function refresh() {
     console.log("refreshing..");
-    var filtered_activities = run_filter(activities);
+    xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/activities', true);
+    xhr.onload = function() {
+        var response = JSON.parse(xhr.responseText);
+        console.log("Got activities: ", response);
+        activities = response.result.activities;
+        var filtered_activities = run_filter(activities);
 
-    drawmap(filtered_activities);
+        drawmap(filtered_activities);
+    };
+    xhr.send();
 }
 
 function init() {
