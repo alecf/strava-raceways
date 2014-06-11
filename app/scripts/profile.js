@@ -1,19 +1,37 @@
 
+// Get a stream and attach it to the activity.
+function get_streams(activity) {
+    var activity_id = activity.activity_id;
+    return promiseXhrJson('/api/streams?activity_id=' + activity_id)
+        .then(function(streams) {
+            var stream = streams.result.streams[activity_id];
+            console.log("Got stream from ", activity_id, ": ", streams);
+            activity.stream = stream;
+            return index_stream(stream);
+        });
+}
+
 // generate metadata about all the streams
 function index_streams(activities) {
     return new Promise(function(resolve, reject) {
         var results = [];
         for (var i = 0; i < activities.length; ++i) {
-            if (activities[i].stream)
-                results.push(index_stream(activities[i].stream));
+            results.push(get_streams(activities[i]));
         }
         Promise.all(results).then(function(stream_indexes) {
+            console.log("All streams ready! ", stream_indexes);
             resolve(stream_indexes);
+        }).catch(function(ex) {
+            console.error("oops, rejected: ", ex);
         });
     });
 }
 
+// generate metadata about a single stream
 function index_stream(stream) {
+    if (!stream) {
+        console.error("no stream for you!", stream);
+    }
     return new Promise(function(resolve, reject) {
         var metadata = {domain: {}};
 
@@ -279,16 +297,28 @@ function sum(values) {
 
 function promiseXhrJson(url) {
     return new Promise(function(resolve, reject) {
-        xhr = new XMLHttpRequest();
-        xhr.open('GET', '/api/activities', true);
-        xhr.onload = function() {
-            var response = JSON.parse(xhr.responseText);
-            resolve(response);
+        try {
+            var xhr = new XMLHttpRequest();
+            LASTXHR = xhr;
+            xhr.open('GET', url, true);
+            xhr.onload = function() {
+                // console.error("Got response from ", url, ": ", xhr.responseText);
+                try {
+                    var response = JSON.parse(xhr.responseText);
+                    resolve(response);
+                } catch(ex) {
+                    console.trace(ex, " in ", xhr.responseText);
+                    reject(ex);
+                }
+            };
+            xhr.onerror = function(e) {
+                reject(e);
+            };
+            console.log("Requesting ", url);
+            xhr.send();
+        } catch (ex) {
+            reject(ex);
         };
-        xhr.onerror = function(e) {
-            reject(e);
-        };
-        xhr.send();
     });
 }
 
@@ -300,7 +330,7 @@ function refresh() {
         var filtered_activities = run_filter(activities);
 
         drawmap(filtered_activities);
-    });
+    }).catch(function(e) { console.error(e); });
 }
 
 function init() {
@@ -320,3 +350,4 @@ if (document.readyState == "complete") {
 } else {
     document.addEventListener('DOMContentLoaded', init);
 }
+console.log("profile.js loaded, should be calling other stuff");
