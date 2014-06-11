@@ -1,26 +1,34 @@
 
 // generate metadata about all the streams
 function index_streams(activities) {
-    var results = [];
-    console.log("Indexing ", activities);
-    for (var i = 0; i < activities.length; ++i) {
-        if (!activities[i].stream)
-            continue;
+    return new Promise(function(resolve, reject) {
+        var results = [];
+        for (var i = 0; i < activities.length; ++i) {
+            if (activities[i].stream)
+                results.push(index_stream(activities[i].stream));
+        }
+        Promise.all(results).then(function(stream_indexes) {
+            resolve(stream_indexes);
+        });
+    });
+}
 
+function index_stream(stream) {
+    return new Promise(function(resolve, reject) {
         var metadata = {domain: {}};
-        results.push(metadata);
 
-        var latlng_stream = activities[i].stream.latlng;
+        var latlng_stream = stream.latlng;
+        var alt_stream = stream.altitude;
 
-        if (!latlng_stream)
-            continue;
-        var alt_stream = activities[i].stream.altitude;
-
-        metadata.domain.lat = d3.extent(latlng_stream.data, accessor(0));
-        metadata.domain.lng = d3.extent(latlng_stream.data, accessor(1));
-        metadata.domain.alt = d3.extent(alt_stream.data);
-    }
-    return results;
+        if (latlng_stream) {
+            metadata.domain.lat = d3.extent(latlng_stream.data, accessor(0));
+            metadata.domain.lng = d3.extent(latlng_stream.data, accessor(1));
+        }
+        if (alt_stream) {
+            metadata.domain.alt = d3.extent(alt_stream.data);
+        }
+        resolve(metadata);
+    });
 }
 
 function accessor(attr) {
@@ -67,14 +75,15 @@ Bounds.prototype.setSize = function(width, height) {
 };
 
 function drawmap(activities) {
-    var index = index_streams(activities);
-    I = index;
-    console.log("Have index", index);
-    var bounds = new Bounds(index);
-    console.log("have bounds", bounds);
-    B= bounds;
+    index_streams(activities).then(function(index) {
+        I = index;
+        console.log("Have index", index);
+        var bounds = new Bounds(index);
+        console.log("have bounds", bounds);
+        B= bounds;
 
-    drawWithBounds(bounds, activities);
+        drawWithBounds(bounds, activities);
+    });
 }
 
 function drawWithBounds(bounds, activities) {
