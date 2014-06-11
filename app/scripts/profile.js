@@ -277,19 +277,30 @@ function sum(values) {
     return values.reduceRight(function(previous, current) { return previous+current; });
 }
 
+function promiseXhrJson(url) {
+    return new Promise(function(resolve, reject) {
+        xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/activities', true);
+        xhr.onload = function() {
+            var response = JSON.parse(xhr.responseText);
+            resolve(response);
+        };
+        xhr.onerror = function(e) {
+            reject(e);
+        };
+        xhr.send();
+    });
+}
+
 function refresh() {
     console.log("refreshing..");
-    xhr = new XMLHttpRequest();
-    xhr.open('GET', '/api/activities', true);
-    xhr.onload = function() {
-        var response = JSON.parse(xhr.responseText);
+    return promiseXhrJson('/api/activities').then(function(response) {
         console.log("Got activities: ", response);
         activities = response.result.activities;
         var filtered_activities = run_filter(activities);
 
         drawmap(filtered_activities);
-    };
-    xhr.send();
+    });
 }
 
 function init() {
