@@ -5,7 +5,6 @@ function get_stream(activity) {
     return XHR('/api/streams?activity_id=' + activity_id)
         .then(function(streams) {
             var stream = streams.result.streams[activity_id];
-            console.log("Got stream from ", activity_id, ": ", streams);
             activity.stream = stream;
             return stream;
         });
@@ -119,8 +118,6 @@ Dataset.prototype.activities = function() {
     });
 };
 
-
-
 function drawWithBounds(bounds, activities) {
     var canvas = document.querySelector('#map');
 
@@ -158,7 +155,6 @@ function drawWithBounds(bounds, activities) {
         }
     }
 
-
     for (var i = 0; i < activities.length; ++i) {
         if (!activities[i].stream)
             continue;
@@ -178,10 +174,12 @@ function drawWithBounds(bounds, activities) {
     }
 }
 
-// creates a filter from the UI controls
+// creates a filter from the UI controls, where the filter is in the form
+// [[key, value], [key, value]]
 function make_filter() {
     var test_props = [];
     var test_value = [];
+    var test_compare = [];
 
     // generate filter
     var controls = document.querySelectorAll('.map-control');
@@ -192,10 +190,12 @@ function make_filter() {
             var criterium = criteria[j];
             if (criterium.classList.contains('polymer-selected')) {
                 var value = criterium.getAttribute('value');
-                console.log(controls[i], criterium, "Got criterium value: ", value);
+                var filter_id = criterium.getAttribute('filter');
+                var filter = FILTERS_BY_ID[filter_id];
                 if (value != '*') {
                     value = JSON.parse(value);
 
+                    // XXX use filter.compare here
                     if (value.length != properties.length) {
                         console.warn("prop/value mismatch: ", properties, " vs. ", value);
                         break;
@@ -372,18 +372,8 @@ function refresh() {
     return D.activities().then(drawmap).catch(function(ex) { console.error(ex); });
 }
 
-FILTERS = [
-    { name: 'Location',
-      shortkey: 'location',
-      key: ['location_city', 'location_state', 'location_country'],
-    },
-    { name: 'Type',
-      shortkey: 'type',
-      key: ['type'],
-    }
-];
-
-// given a keylist like ['foo', 'bar'] extracts the corresponding objects from obj, i.e. returns [obj.foo, obj.bar]
+// given a keylist like ['foo', 'bar'] extracts the corresponding
+// objects from obj, i.e. returns [obj.foo, obj.bar]
 function extract_key_value(key_list, obj) {
     var key_value = [];
     key_list.forEach(function(subkey) {
@@ -391,6 +381,30 @@ function extract_key_value(key_list, obj) {
     });
     return key_value;
 }
+
+function equals(a, b) {
+    return a == b;
+}
+
+FILTERS = [
+    { name: 'Location',
+      id: 'location',
+      key: ['location_city', 'location_state', 'location_country'],
+      extract: extract_key_value,
+      compare: equals,
+    },
+    { name: 'Type',
+      id: 'type',
+      key: ['type'],
+      extract: extract_key_value,
+      compare: equals,
+    }
+];
+
+FILTERS_BY_ID = {};
+FILTERS.forEach(function(filter) {
+    FILTERS_BY_ID[filter.id] = filter;
+});
 
 function update_progress_indicator(waiting, complete) {
     console.log("update_progress(", waiting, ", ", complete);
@@ -407,24 +421,22 @@ function init() {
     D.activities().then(function(activities) {
         FILTERS.forEach(function(filter) {
             var key_values = {};
-            console.log("Filter: ", filter);
             var key_string = JSON.stringify(filter.key);
             // extract all possible key values
             activities.forEach(function(activity) {
-                var key_value = extract_key_value(filter.key, activity);
+                var key_value = filter.extract(filter.key, activity);
                 key_values[JSON.stringify(key_value)] = true;
             });
 
-            console.log("Possible values: ", Object.keys(key_values));
             // now build up the filter UI
             // (Note this will get way more complex in a bit)
             Object.keys(key_values).forEach(function(key_value) {
                 var sp = $('<span>')
                         .addClass('tab')
                         .attr('value', key_value)
+                        .attr('filter', filter.id)
                         .text(JSON.parse(key_value)[0]);
-                console.log("Building up ui in ", $('.filter-' + filter.shortkey));
-                $('.filter-' + filter.shortkey).append(sp);
+                $('.filter-' + filter.id).append(sp);
             });
         });
         // extract all visible keys
