@@ -54,7 +54,6 @@ class UpdateHandler(BaseHandler):
         result['total_activities'] = len(strava_activities)
         pending_keys, activity_records = yield load_activities([activity['id'] for activity in strava_activities])
 
-        # print "Loading activities from {}".format(activity_records)
         activity_records = yield activity_records
         activity_requests = []
         for index, key, strava_activity, record in zip(xrange(len(pending_keys)),
@@ -64,9 +63,6 @@ class UpdateHandler(BaseHandler):
             if record is None:
                 activity_requests.append((index, key, strava_activity))
 
-        print "Loading {} missing records: {}".format(len(activity_requests),
-                                                      ','.join([str(a[2]['id']) for a in activity_requests]))
-                
         for index, missing_key, strava_activity in activity_requests:
             activity_record = model.Activity(id=missing_key.id())
             for key, value in strava_activity.iteritems():
@@ -79,8 +75,6 @@ class UpdateHandler(BaseHandler):
             result['new_activities'].append(strava_activity)
             pending_writes.append(activity_record.put_async())
 
-        print "Now we have {} valid records...looking for their streams!".format(len(activity_records))
-        
         # now pick up missing streams
         pending_stream_keys = []
         for activity_record in activity_records:
@@ -96,15 +90,10 @@ class UpdateHandler(BaseHandler):
         # resolve futures
         
         stream_requests = []
-        print "zipping up {} activities and {} record pairs".format(len(strava_activities), len(pairwise(stream_records)))
         for activity_record, (latlng_stream, altitude_stream) in zip(activity_records,
                                                                      pairwise(stream_records)):
             if latlng_stream is None or altitude_stream is None:
                 stream_requests.append(activity_record.key.id())
-            else:
-                print "Have lat and lng for activity: {} / {} / {}".format(activity_record.key.id(),
-                                                                           latlng_stream.key.id(),
-                                                                           altitude_stream.key.id())
 
         print "Missing {} streams, fetching".format(len(stream_requests))
         pending_stream_requests = yield self.fetch_streams(stream_requests)
