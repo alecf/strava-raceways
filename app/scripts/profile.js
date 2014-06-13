@@ -39,12 +39,11 @@ function index_stream(stream) {
 
         var latlng_stream = stream.latlng;
         var alt_stream = stream.altitude;
-
-        if (latlng_stream) {
+        if (latlng_stream && latlng_stream.data) {
             metadata.domain.lat = d3.extent(latlng_stream.data, accessor(0));
             metadata.domain.lng = d3.extent(latlng_stream.data, accessor(1));
         }
-        if (alt_stream) {
+        if (alt_stream && alt_stream.data) {
             metadata.domain.alt = d3.extent(alt_stream.data);
         }
         resolve(metadata);

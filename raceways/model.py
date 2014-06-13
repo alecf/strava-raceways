@@ -89,9 +89,15 @@ class Activity(ndb.Model):
     best_efforts = ndb.JsonProperty() # array of best effort summaries - running activities only
 
 class Stream(ndb.Model):
+    version = 4
     type = ndb.StringProperty()
-    data = ndb.JsonProperty(repeated=True)
+    data = ndb.JsonProperty()
     activity_id = ndb.IntegerProperty()  # not used right now, this is embedded in the id
     series_type = ndb.StringProperty()
     original_size = ndb.IntegerProperty()
     resolution = ndb.StringProperty()   # low, medium or high
+
+    @classmethod
+    def make_key_string(cls, activity_id, stream_type):
+        return "{}|v={}|type={}".format(activity_id, cls.version, stream_type)
+

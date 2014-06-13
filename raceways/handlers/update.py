@@ -25,9 +25,6 @@ def load_activities(activity_ids):
     raise ndb.Return(result)
 
 
-def format_stream_key(activity_id, stream_type):
-    return "{}|v=2|type={}".format(activity_id, stream_type)
-
 class UpdateHandler(BaseHandler):
 
     @authorized
@@ -80,7 +77,7 @@ class UpdateHandler(BaseHandler):
         for activity_record in activity_records:
             for stream_type in ('latlng', 'altitude'):
                 stream_key = ndb.Key(model.Stream,
-                                     format_stream_key(activity_record.key.id(), stream_type))
+                                     model.Stream.make_key_string(activity_record.key.id(), stream_type))
                 # for pairwise() later
                 pending_stream_keys.append(stream_key)
 
@@ -107,7 +104,7 @@ class UpdateHandler(BaseHandler):
 
             for stream in streams:
                 stream_type = stream['type']   # latlng or altitude
-                stream_entity_id = format_stream_key(activity_id, stream_type)
+                stream_entity_id = model.Stream.make_key_string(activity_id, stream_type)
                 stream_record = model.Stream(id=stream_entity_id)
 
                 for key, value in stream.iteritems():
