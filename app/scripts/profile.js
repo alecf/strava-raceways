@@ -1,13 +1,13 @@
 
 // Get a stream and attach it to the activity.
-function get_streams(activity) {
+function get_stream(activity) {
     var activity_id = activity.activity_id;
-    return promiseXhrJson('/api/streams?activity_id=' + activity_id)
+    return XHR('/api/streams?activity_id=' + activity_id)
         .then(function(streams) {
             var stream = streams.result.streams[activity_id];
             console.log("Got stream from ", activity_id, ": ", streams);
             activity.stream = stream;
-            return index_stream(stream);
+            return stream;
         });
 }
 
@@ -16,7 +16,10 @@ function index_streams(activities) {
     return new Promise(function(resolve, reject) {
         var results = [];
         for (var i = 0; i < activities.length; ++i) {
-            results.push(get_streams(activities[i]));
+            if (!activities[i].stream)
+                results.push(get_stream(activities[i]).then(index_stream));
+            else
+                results.push(index_stream(activities[i].stream));
         }
         Promise.all(results).then(function(stream_indexes) {
             console.log("All streams ready! ", stream_indexes);
@@ -30,7 +33,7 @@ function index_streams(activities) {
 // generate metadata about a single stream
 function index_stream(stream) {
     if (!stream) {
-        console.error("no stream for you!", stream);
+        return Promise.reject("Missing stream");
     }
     return new Promise(function(resolve, reject) {
         var metadata = {domain: {}};
@@ -58,7 +61,6 @@ function accessor(attr) {
 // an object that represents the bounds of a map
 // note that there is no projection here
 function Bounds(stream_index) {
-    console.log("Got index: ", stream_index);
     var extents = {
         min_lat: d3.extent(stream_index, function(d) { return d.domain.lat[0]; })[0],
         max_lat: d3.extent(stream_index, function(d) { return d.domain.lat[1]; })[1],
@@ -95,7 +97,6 @@ Bounds.prototype.setSize = function(width, height) {
 function drawmap(activities) {
     index_streams(activities).then(function(index) {
         I = index;
-        console.log("Have index", index);
         var bounds = new Bounds(index);
         console.log("have bounds", bounds);
         B= bounds;
@@ -103,6 +104,22 @@ function drawmap(activities) {
         drawWithBounds(bounds, activities);
     });
 }
+
+function Dataset() {
+    this._pending_activities =
+        XHR('/api/activities').then(function(response) {
+            console.log("Got activities: ", response);
+            return response.result.activities;
+        });
+}
+
+Dataset.prototype.activities = function() {
+    return this._pending_activities.then(function(activities) {
+        return run_filter(activities);
+    });
+};
+
+
 
 function drawWithBounds(bounds, activities) {
     var canvas = document.querySelector('#map');
@@ -161,6 +178,7 @@ function drawWithBounds(bounds, activities) {
     }
 }
 
+// creates a filter from the UI controls
 function make_filter() {
     var test_props = [];
     var test_value = [];
@@ -174,6 +192,7 @@ function make_filter() {
             var criterium = criteria[j];
             if (criterium.classList.contains('polymer-selected')) {
                 var value = criterium.getAttribute('value');
+                console.log(controls[i], criterium, "Got criterium value: ", value);
                 if (value != '*') {
                     value = JSON.parse(value);
 
@@ -295,59 +314,133 @@ function sum(values) {
     return values.reduceRight(function(previous, current) { return previous+current; });
 }
 
-function promiseXhrJson(url) {
-    return new Promise(function(resolve, reject) {
-        try {
-            var xhr = new XMLHttpRequest();
-            LASTXHR = xhr;
-            xhr.open('GET', url, true);
-            xhr.onload = function() {
-                // console.error("Got response from ", url, ": ", xhr.responseText);
-                try {
-                    var response = JSON.parse(xhr.responseText);
-                    resolve(response);
-                } catch(ex) {
-                    console.trace(ex, " in ", xhr.responseText);
-                    reject(ex);
-                }
+// Create an XHR context that fires off progress notifications
+// usage:
+// function update_progress(waiting, total) {
+//   console.log("Updated ", waiting, " / ", total);
+// }
+// var XHR = xhrContext(update_progress);
+// XHR('http://....).then(function(result)) {... });
+function xhrContext(progress) {
+    var total_started = 0;
+    var total_complete = 0;
+
+    function update_progress() {
+        progress(total_started, total_complete);
+        if (total_started == total_complete)
+            total_started = total_complete = 0;
+    }
+
+    return function(url) {
+        total_started += 1;
+        progress(total_started, total_complete);
+        return new Promise(function(resolve, reject) {
+            try {
+                var xhr = new XMLHttpRequest();
+                LASTXHR = xhr;
+                xhr.open('GET', url, true);
+                xhr.onload = function() {
+                    // console.error("Got response from ", url, ": ", xhr.responseText);
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        resolve(response);
+                    } catch(ex) {
+                        console.trace(ex, " in ", xhr.responseText);
+                        reject(ex);
+                    }
+                    total_complete += 1;
+                    update_progress();
+                };
+                xhr.onerror = function(e) {
+                    total_complete += 1;
+                    update_progress();
+                    reject(e);
+                };
+                console.log("Requesting ", url);
+                xhr.send();
+            } catch (ex) {
+                total_complete +=1;
+                update_progress();
+                reject(ex);
             };
-            xhr.onerror = function(e) {
-                reject(e);
-            };
-            console.log("Requesting ", url);
-            xhr.send();
-        } catch (ex) {
-            reject(ex);
-        };
-    });
+        });
+    };
 }
 
 function refresh() {
     console.log("refreshing..");
-    return promiseXhrJson('/api/activities').then(function(response) {
-        console.log("Got activities: ", response);
-        activities = response.result.activities;
-        var filtered_activities = run_filter(activities);
+    return D.activities().then(drawmap).catch(function(ex) { console.error(ex); });
+}
 
-        drawmap(filtered_activities);
-    }).catch(function(e) { console.error(e); });
+FILTERS = [
+    { name: 'Location',
+      shortkey: 'location',
+      key: ['location_city', 'location_state', 'location_country'],
+    },
+    { name: 'Type',
+      shortkey: 'type',
+      key: ['type'],
+    }
+];
+
+// given a keylist like ['foo', 'bar'] extracts the corresponding objects from obj, i.e. returns [obj.foo, obj.bar]
+function extract_key_value(key_list, obj) {
+    var key_value = [];
+    key_list.forEach(function(subkey) {
+        key_value.push(obj[subkey]);
+    });
+    return key_value;
+}
+
+function update_progress_indicator(waiting, complete) {
+    console.log("update_progress(", waiting, ", ", complete);
+    if (waiting == complete)
+        $('#progress').hide();
+    else
+        $('#progress').show().text(complete*100/waiting + "%");
 }
 
 function init() {
-    refresh();
+    XHR = xhrContext(update_progress_indicator);
 
-    var controls = document.querySelectorAll('.map-control > polymer-ui-tabs');
+    D = new Dataset();
+    D.activities().then(function(activities) {
+        FILTERS.forEach(function(filter) {
+            var key_values = {};
+            console.log("Filter: ", filter);
+            var key_string = JSON.stringify(filter.key);
+            // extract all possible key values
+            activities.forEach(function(activity) {
+                var key_value = extract_key_value(filter.key, activity);
+                key_values[JSON.stringify(key_value)] = true;
+            });
+
+            console.log("Possible values: ", Object.keys(key_values));
+            // now build up the filter UI
+            // (Note this will get way more complex in a bit)
+            Object.keys(key_values).forEach(function(key_value) {
+                var sp = $('<span>')
+                        .addClass('tab')
+                        .attr('value', key_value)
+                        .text(JSON.parse(key_value)[0]);
+                console.log("Building up ui in ", $('.filter-' + filter.shortkey));
+                $('.filter-' + filter.shortkey).append(sp);
+            });
+        });
+        // extract all visible keys
+    });
+
+    var controls = document.querySelectorAll('.map-control polymer-ui-tabs');
     for (var i = 0; i < controls.length; ++i) {
         if (!controls[i].hasEventListener) {
             controls[i].addEventListener('polymer-activate', refresh);
             controls[i].hasEventListener = true;
         }
     }
+
+    refresh();
 }
+
 // hack hack
-if (document.readyState == "complete") {
-    init();
-} else {
-    document.addEventListener('DOMContentLoaded', init);
-}
+document.addEventListener('WebComponentsReady', init);
 console.log("profile.js loaded, should be calling other stuff");
