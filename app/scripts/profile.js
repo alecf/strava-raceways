@@ -181,9 +181,9 @@ function draw2d(bounds, activities) {
 
 // creates a filter from the UI controls, where the filter is in the form
 // [[key, value], [key, value]]
-function make_filter() {
+function make_filters() {
     var test_value = [];
-    var test_filter = [];
+    var test_facet = [];
 
     // generate filter
     var controls = document.querySelectorAll('.map-control');
@@ -194,37 +194,37 @@ function make_filter() {
             var criterium = criteria[j];
             if (criterium.classList.contains('polymer-selected')) {
                 var value = criterium.getAttribute('value');
-                var filter_id = criterium.getAttribute('filter');
-                var filter = FILTERS_BY_ID[filter_id];
+                var facet_id = criterium.getAttribute('facet');
+                var facet = FACETS_BY_ID[facet_id];
                 if (value != '*') {
-                    console.log("Trying to extract using ", filter.key, " and ", value);
-                    // note that the filters contain the already-extracted values
+                    console.log("Trying to extract using ", facet.key, " and ", value);
+                    // note that the facets contain the already-extracted values
                     value = JSON.parse(value);
                     console.log("And value has become ", value);
                     test_value.push(value);
-                    test_filter.push(filter);
-                    console.log("I need to check for ", properties, ' = ', value, ' using ', filter);
+                    test_facet.push(facet);
+                    console.log("I need to check for ", properties, ' = ', value, ' using ', facet);
                 }
             }
         }
     }
 
-    return [test_value, test_filter];
+    return [test_value, test_facet];
 }
 
 function run_filter(activities) {
-    var filter_params = make_filter();
+    var filter_params = make_filters();
     var match_value = filter_params[0];
-    var filters = filter_params[1];
+    var facets = filter_params[1];
     var result = [];
     for (var i = 0; i < activities.length; ++i) {
         var matches = true;
         var activity = activities[i];
         console.log("Processing filters: ", filter_params);
-        for (var j = 0; j < filters.length; j++) {
-            var filter = filters[j];
-            var value = filter.extract(filter.key, activity);
-            if (!filter.matches(match_value[j], value)) {
+        for (var j = 0; j < facets.length; j++) {
+            var facet = facets[j];
+            var value = facet.extract(facet.key, activity);
+            if (!facet.matches(match_value[j], value)) {
                 matches = false;
                 break;
             }
@@ -238,8 +238,7 @@ function run_filter(activities) {
 // activities is just the regular activities list
 // properies is an array of arrays of properties:
 // [['type'], ['gear_id']]
-function create_filter_ui(activities, properties_list) {
-
+function create_facet_ui(activities, properties_list) {
     // count of propvals[proname][value] == count, like
     // propval['type']['Ride'] == 12
     var propvals = {};
@@ -421,7 +420,7 @@ function display_value(value, count) {
     return value + " (" + count + ")";
 }
 
-FILTERS = [
+FACETS = [
     { name: 'Location',
       id: 'location',
       key: ['location_city', 'location_state', 'location_country'],
@@ -445,9 +444,9 @@ FILTERS = [
     }
 ];
 
-FILTERS_BY_ID = {};
-FILTERS.forEach(function(filter) {
-    FILTERS_BY_ID[filter.id] = filter;
+FACETS_BY_ID = {};
+FACETS.forEach(function(facet) {
+    FACETS_BY_ID[facet.id] = facet;
 });
 
 function update_progress_indicator(waiting, complete) {
@@ -463,12 +462,12 @@ function init() {
 
     D = new Dataset();
     D.activities().then(function(activities) {
-        FILTERS.forEach(function(filter) {
+        FACETS.forEach(function(facet) {
             var key_counts = {};
-            var key_string = JSON.stringify(filter.key);
+            var key_string = JSON.stringify(facet.key);
             // extract all possible key values
             activities.forEach(function(activity) {
-                var key_value = filter.extract(filter.key, activity);
+                var key_value = facet.extract(facet.key, activity);
                 var key = JSON.stringify(key_value);
                 if (!(key in key_counts))
                     key_counts[key] = 0;
@@ -477,16 +476,16 @@ function init() {
 
             console.log("Extracted: ", Object.keys(key_counts));
 
-            // now build up the filter UI
+            // now build up the facet UI
             // (Note this will get way more complex in a bit)
             Object.keys(key_counts).forEach(function(key) {
                 var count = key_counts[key];
                 var sp = $('<span>')
                         .addClass('tab')
                         .attr('value', key)
-                        .attr('filter', filter.id)
-                        .text(filter.display(JSON.parse(key), count));
-                $('.filter-' + filter.id).append(sp);
+                        .attr('facet', facet.id)
+                        .text(facet.display(JSON.parse(key), count));
+                $('.facet-' + facet.id).append(sp);
             });
         });
         // extract all visible keys
