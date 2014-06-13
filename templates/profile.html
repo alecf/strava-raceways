@@ -12,11 +12,11 @@
     <div class="map-control map-location" properties='["location_city","location_state","location_country"]'>Location:
         <polymer-ui-tabs valueattr="value" selected="*" class="filter-location">
             <span class="tab" value="*">All</span>
-            {#
-            {% for location in locations -%}
-            <span class="tab" value='{{json.dumps(location)|safe}}'>{{location[0]}}</span>
-            {% endfor %}
-            #}
+        </polymer-ui-tabs>
+    </div>
+    <div class="map-control map-location" properties='["start_date"]'>Day of Week:
+        <polymer-ui-tabs valueattr="value" selected="*" class="filter-day_of_week">
+            <span class="tab" value="*">All</span>
         </polymer-ui-tabs>
     </div>
     <div>

@@ -100,7 +100,7 @@ function drawmap(activities) {
         console.log("have bounds", bounds);
         B= bounds;
 
-        drawWithBounds(bounds, activities);
+        draw2d(bounds, activities);
     });
 }
 
@@ -114,11 +114,17 @@ function Dataset() {
 
 Dataset.prototype.activities = function() {
     return this._pending_activities.then(function(activities) {
-        return run_filter(activities);
+        var r = run_filter(activities);
+        console.log("Filtered to ", r.length, " activities");
+        return r;
     });
 };
 
-function drawWithBounds(bounds, activities) {
+function draw3d(bounds, activities) {
+    //
+}
+
+function draw2d(bounds, activities) {
     var canvas = document.querySelector('#map');
 
     bounds.setSize(canvas.width, canvas.height);
@@ -128,7 +134,6 @@ function drawWithBounds(bounds, activities) {
 
     // draw altitude gradients first - this is terribly inefficient
     var gradientRadius = canvas.width * 0.02;
-    console.log("radius: ", gradientRadius);
     var gradientCache = {};
     for (var i = 0; i < activities.length; ++i) {
         if (!activities[i].stream)
@@ -177,9 +182,8 @@ function drawWithBounds(bounds, activities) {
 // creates a filter from the UI controls, where the filter is in the form
 // [[key, value], [key, value]]
 function make_filter() {
-    var test_props = [];
     var test_value = [];
-    var test_compare = [];
+    var test_filter = [];
 
     // generate filter
     var controls = document.querySelectorAll('.map-control');
@@ -193,36 +197,34 @@ function make_filter() {
                 var filter_id = criterium.getAttribute('filter');
                 var filter = FILTERS_BY_ID[filter_id];
                 if (value != '*') {
+                    console.log("Trying to extract using ", filter.key, " and ", value);
+                    // note that the filters contain the already-extracted values
                     value = JSON.parse(value);
-
-                    // XXX use filter.compare here
-                    if (value.length != properties.length) {
-                        console.warn("prop/value mismatch: ", properties, " vs. ", value);
-                        break;
-                    }
-                    for (var k = 0; k < properties.length; ++k) {
-                        test_props.push(properties[k]);
-                        test_value.push(value[k]);
-                    }
-                    console.log("I need to check for ", properties, ' = ', value);
+                    console.log("And value has become ", value);
+                    test_value.push(value);
+                    test_filter.push(filter);
+                    console.log("I need to check for ", properties, ' = ', value, ' using ', filter);
                 }
             }
         }
     }
 
-    return [test_props, test_value];
+    return [test_value, test_filter];
 }
 
 function run_filter(activities) {
-    var filter = make_filter();
-    var props = filter[0];
-    var values = filter[1];
+    var filter_params = make_filter();
+    var match_value = filter_params[0];
+    var filters = filter_params[1];
     var result = [];
     for (var i = 0; i < activities.length; ++i) {
         var matches = true;
         var activity = activities[i];
-        for (var j = 0; j < props.length; ++j) {
-            if (activity[props[j]] != values[j]) {
+        console.log("Processing filters: ", filter_params);
+        for (var j = 0; j < filters.length; j++) {
+            var filter = filters[j];
+            var value = filter.extract(filter.key, activity);
+            if (!filter.matches(match_value[j], value)) {
                 matches = false;
                 break;
             }
@@ -374,7 +376,7 @@ function refresh() {
 
 // given a keylist like ['foo', 'bar'] extracts the corresponding
 // objects from obj, i.e. returns [obj.foo, obj.bar]
-function extract_key_value(key_list, obj) {
+function extract_key_list_value(key_list, obj) {
     var key_value = [];
     key_list.forEach(function(subkey) {
         key_value.push(obj[subkey]);
@@ -382,22 +384,64 @@ function extract_key_value(key_list, obj) {
     return key_value;
 }
 
+function extract_key_value(key, obj) {
+    return obj[key];
+}
+
 function equals(a, b) {
     return a == b;
+}
+
+function equals_lists(a, b) {
+    if (a.length != b.length)
+        return false;
+    for (var i = 0; i < a.length; ++i)
+        if (a[i] != b[i])
+            return false;
+    return true;
+}
+
+function equals_day_of_week(a, b) {
+    console.log("Comparing ", a, " and ", b, ": ", a == b);
+    return a == b;
+}
+
+var DAYS = [ "Sun", "Mon", "Tue", "Wed", "Thurs", "Fri", "Sat"];
+function extract_day_of_week(key, obj) {
+    var value = extract_key_value(key, obj);
+    var day = new Date(value).getDay();
+    return DAYS[day];
+}
+
+function display_city(values, count) {
+    return values[0] + " (" + count + ")";
+}
+
+function display_value(value, count) {
+    return value + " (" + count + ")";
 }
 
 FILTERS = [
     { name: 'Location',
       id: 'location',
       key: ['location_city', 'location_state', 'location_country'],
-      extract: extract_key_value,
-      compare: equals,
+      extract: extract_key_list_value,
+      matches: equals_lists,
+      display: display_city,
     },
     { name: 'Type',
       id: 'type',
-      key: ['type'],
+      key: 'type',
       extract: extract_key_value,
-      compare: equals,
+      matches: equals,
+      display: display_value,
+    },
+    { name: 'Day of Week',
+      id: 'day_of_week',
+      key: 'start_date',
+      extract: extract_day_of_week,
+      matches: equals_day_of_week,
+      display: display_value,
     }
 ];
 
@@ -420,22 +464,28 @@ function init() {
     D = new Dataset();
     D.activities().then(function(activities) {
         FILTERS.forEach(function(filter) {
-            var key_values = {};
+            var key_counts = {};
             var key_string = JSON.stringify(filter.key);
             // extract all possible key values
             activities.forEach(function(activity) {
                 var key_value = filter.extract(filter.key, activity);
-                key_values[JSON.stringify(key_value)] = true;
+                var key = JSON.stringify(key_value);
+                if (!(key in key_counts))
+                    key_counts[key] = 0;
+                key_counts[key] += 1;
             });
+
+            console.log("Extracted: ", Object.keys(key_counts));
 
             // now build up the filter UI
             // (Note this will get way more complex in a bit)
-            Object.keys(key_values).forEach(function(key_value) {
+            Object.keys(key_counts).forEach(function(key) {
+                var count = key_counts[key];
                 var sp = $('<span>')
                         .addClass('tab')
-                        .attr('value', key_value)
+                        .attr('value', key)
                         .attr('filter', filter.id)
-                        .text(JSON.parse(key_value)[0]);
+                        .text(filter.display(JSON.parse(key), count));
                 $('.filter-' + filter.id).append(sp);
             });
         });
