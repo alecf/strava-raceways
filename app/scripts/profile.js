@@ -60,14 +60,14 @@ function accessor(attr) {
 // note that there is no projection here
 function Bounds(stream_index) {
     var extents = {
-        min_lat: d3.extent(stream_index, function(d) { return d.domain.lat[0]; })[0],
-        max_lat: d3.extent(stream_index, function(d) { return d.domain.lat[1]; })[1],
-        min_lng: d3.extent(stream_index, function(d) { return d.domain.lng[0]; })[0],
-        max_lng: d3.extent(stream_index, function(d) { return d.domain.lng[1]; })[1],
-        min_alt: d3.extent(stream_index, function(d) { return d.domain.alt[0]; })[0],
-        max_alt: d3.extent(stream_index, function(d) { return d.domain.alt[1]; })[1],
+        min_lat: d3.min(stream_index, function(d) { return d.domain.lat[0]; }),
+        max_lat: d3.max(stream_index, function(d) { return d.domain.lat[1]; }),
+        min_lng: d3.min(stream_index, function(d) { return d.domain.lng[0]; }),
+        max_lng: d3.max(stream_index, function(d) { return d.domain.lng[1]; }),
+        min_alt: d3.min(stream_index, function(d) { return d.domain.alt[0]; }),
+        max_alt: d3.max(stream_index, function(d) { return d.domain.alt[1]; }),
     };
-    console.log("Now have extents.domain = ", extents);
+    console.log("Now have extents = ", extents);
 
     var padding_x = (extents.max_lng - extents.min_lng) * 0.1;
     var padding_y = (extents.max_lat - extents.min_lat) * 0.1;
@@ -92,14 +92,25 @@ Bounds.prototype.setSize = function(width, height) {
     this.scale_z.range([100, 200]); // lower number = darker = lower altitude
 };
 
+Bounds.prototype.center = function() {
+    var lng_delta = this.scale_x.domain()[1] - this.scale_x.domain()[0];
+    var lng_center = this.scale_x.domain()[0] + lng_delta/2;
+
+    var lat_delta = this.scale_y.domain()[1] - this.scale_x.domain()[0];
+    var lat_center = this.scale_y.domain()[0] + lat_delta/2;
+
+    return [lat_center, lng_center];
+}
+
 function drawmap(activities) {
-    index_streams(activities).then(function(index) {
+    return index_streams(activities).then(function(index) {
         I = index;
         var bounds = new Bounds(index);
         console.log("have bounds", bounds);
         B= bounds;
 
         draw2d(bounds, activities);
+        draw3d(bounds, activities);
     });
 }
 
@@ -120,13 +131,102 @@ Dataset.prototype.activities = function() {
 };
 
 function draw3d(bounds, activities) {
-    //
+    var canvas = document.querySelector('#map-3d');
+
+    bounds.setSize(canvas.width, canvas.height);
+    var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera( 75, canvas.width / canvas.height, 0.1, 1000 );
+    var controls = new THREE.OrbitControls(camera, canvas);
+
+    var renderer = new THREE.WebGLRenderer({
+        canvas: canvas
+    });
+
+    var max_z = -1;
+    var min_z = -1;
+    activities.forEach(function(activity, index) {
+        //console.log("drawing activity ", index, ": ", activity);
+        var geometry = new THREE.Geometry();
+        for (var i = 0; i < activity.stream.altitude.data.length; ++i) {
+            var point = activity.stream.latlng.data[i];
+            var altitude = activity.stream.altitude.data[i];
+
+            var x = Math.round(bounds.scale_x(point[1]));
+            var y = Math.round(bounds.scale_y(point[0]));
+            var z = Math.round(bounds.scale_z(altitude));
+
+            geometry.vertices.push(new THREE.Vector3(x, y, z));
+        }
+        var material = new THREE.LineBasicMaterial({
+            color: color(index),
+            linewidth: 2
+        });
+
+        geometry.computeBoundingBox();
+        console.log("  Bounding box:", geometry.boundingBox);
+        var line = new THREE.Line(geometry, material);
+        scene.add(line);
+    });
+
+    var min = {};
+    var max = {};
+    var center = {};
+    ['x', 'y', 'z'].forEach(function(axis) {
+        max[axis] = d3.max(scene.children, function(child) {
+            return child.geometry.boundingBox.max[axis];
+        });
+        min[axis] = d3.min(scene.children, function(child) {
+            return child.geometry.boundingBox.min[axis];
+        });
+        center[axis] = (max[axis] - min[axis])/2;
+    });
+
+    // backing plane for visual reference
+    var planeGeometry = new THREE.PlaneGeometry( canvas.width, canvas.height );
+    var planeMaterial = new THREE.MeshBasicMaterial( {color: 0xaaaaaa, side: THREE.DoubleSide} );
+    var plane = new THREE.Mesh( planeGeometry, planeMaterial );
+    plane.position.x = canvas.width / 2;
+    plane.position.y = canvas.height / 2;
+    scene.add(plane);
+
+    REFPLANE = plane;
+    CAMERA = camera;
+    SCENE = scene;
+
+    var x_center = (max.x-min.x)/2;
+    var y_center = (max.y-min.y)/2;
+    var z_center = (max.z-min.z)/2;
+    camera.position.set(0, 0, max.z);
+    controls.target.set(center.x, center.y, 0);
+    //camera.lookAt(center.x, center.y, center.z);
+
+    function render() {
+	    requestAnimationFrame(render);
+        controls.update();
+	    renderer.render(scene, camera);
+    }
+    console.log("Kicking off render with ", scene, camera);
+    render();
+
+
+
 }
 
 function draw2d(bounds, activities) {
     var canvas = document.querySelector('#map');
 
     bounds.setSize(canvas.width, canvas.height);
+
+    var center = bounds.center();
+
+    var projection = d3.geo.transverseMercator()
+            .translate(canvas.width / 2, canvas.height/2)
+            .scale(canvas.width * 100) // ???
+            .rotate(center)           // supposed to be the central meridian?
+            .center(center);
+
     var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
     var ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,canvas.width, canvas.height);

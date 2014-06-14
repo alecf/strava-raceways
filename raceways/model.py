@@ -98,6 +98,11 @@ class Stream(ndb.Model):
     resolution = ndb.StringProperty()   # low, medium or high
 
     @classmethod
-    def make_key_string(cls, activity_id, stream_type):
-        return "{}|v={}|type={}".format(activity_id, cls.version, stream_type)
+    def make_key_string(cls, activity_id, stream_type, resolution=None):
+        if not resolution:
+            return "{}|v={}|type={}".format(activity_id, cls.version, stream_type)
+        else:
+            print "resolution is '{}'".format(resolution)
+            return "{}|v={}|type={}|resolution={}".format(
+                activity_id, cls.version, stream_type, resolution)
 

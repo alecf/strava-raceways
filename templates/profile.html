@@ -20,24 +20,47 @@
         </polymer-ui-tabs>
     </div>
     <div>
-    <canvas id="map" width="400" height="400"></canvas>
+        <div>In 3d:</div>
+        <canvas id="map-3d" width="800" height="400"></canvas>
+    </div>
+    <div>
+        <div>In 2d:</div>
+        <canvas id="map" width="400" height="400"></canvas>
     </div>
 </div>
 <ul class="activity-list">
-    {#
-{% for activity in activities %}
-  <li>{{activity.name}} - {{formats.reformat_date(activity['start_date'], activity, athlete)}} ({{activity.type}},
-      <a href="/map?id={{activity.id}}">map</a>, <a href="http://www.strava.com/activities/{{activity.id}}">strava</a>) {{activity.distance}} meters.
-      {% if activity.gear_id-%}[{{activity.gear_id}}]{% endif %}
-  </li>
-{% endfor %}
-  #}
 </ul>
 <script type="text/javascript" defer async>
     var athlete = {{json.dumps(athlete, indent=4, sort_keys=True)|safe}}
 </script>
 <script src="/scripts/eventloop.js" async></script>
 <script src="/scripts/profile.js" async></script>
-<script src="/scripts/third_party/d3.v3.min.js"></script>
-<script src="/scripts/third_party/colorbrewer.js"></script>
+<script src="/scripts/third_party/d3.v3.min.js" async></script>
+<script src="/scripts/third_party/colorbrewer.js" async></script>
+<script src="/scripts/third_party/three.min.js" defer></script>
+<script src="/scripts/third_party/OrbitControls.js" defer></script>
+<script src="/scripts/third_party/TrackballControls.js" defer></script>
+<script id="cubeVertexShader" type="x-shader/x-vertex">
+    uniform float time;
+    varying vec2 vUv;
+ 
+    void main() {
+        vUv = uv;
+        vec3 newPosition = position + normal * vec3(sin(time * 0.2) * 3.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+    }
+</script>
+<script id="cubeFragmentShader" type="x-shader/x-fragment">
+    uniform float time;
+    varying vec2 vUv;
+    
+    void main() {
+    vec2 position = -1.0 + 2.0 * vUv;
+    
+    float red = abs(sin(position.x * position.y + time / 5.0));
+    float green = abs(sin(position.x * position.y + time / 4.0));
+    float blue = abs(sin(position.x * position.y + time / 3.0 ));
+    gl_FragColor = vec4(red, green, blue, 1.0);
+    }
+</script>
 {% endblock %}

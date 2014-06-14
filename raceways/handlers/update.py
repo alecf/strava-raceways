@@ -41,6 +41,8 @@ class UpdateHandler(BaseHandler):
         except ValueError as e:
             per_page = 10
 
+        resolution = self.request.get('resolution', None)
+
         pending_writes = []
 
         athlete = model.Athlete.get_by_id(id=athlete_id)
@@ -66,6 +68,8 @@ class UpdateHandler(BaseHandler):
                 setattr(activity_record, key, value)
             activity_record.athlete_id = strava_activity['athlete']['id']
             activity_record.activity_id = strava_activity['id']
+            if str(activity_record.activity_id) == "138499888":
+                print "Looking up the missing stream!"
 
             assert activity_records[index] is None
             activity_records[index] = activity_record
@@ -76,8 +80,10 @@ class UpdateHandler(BaseHandler):
         pending_stream_keys = []
         for activity_record in activity_records:
             for stream_type in ('latlng', 'altitude'):
-                stream_key = ndb.Key(model.Stream,
-                                     model.Stream.make_key_string(activity_record.key.id(), stream_type))
+                stream_key = ndb.Key(
+                    model.Stream,
+                    model.Stream.make_key_string(activity_record.key.id(),
+                                                 stream_type, resolution=resolution))
                 # for pairwise() later
                 pending_stream_keys.append(stream_key)
 
@@ -91,6 +97,8 @@ class UpdateHandler(BaseHandler):
                                                                      pairwise(stream_records)):
             if latlng_stream is None or altitude_stream is None:
                 stream_requests.append(activity_record.key.id())
+            else:
+                print "Have latlng and altitude for {}".format(activity_record.key.id())
 
         print "Missing {} streams, fetching".format(len(stream_requests))
         pending_stream_requests = yield self.fetch_streams(stream_requests)
@@ -104,7 +112,7 @@ class UpdateHandler(BaseHandler):
 
             for stream in streams:
                 stream_type = stream['type']   # latlng or altitude
-                stream_entity_id = model.Stream.make_key_string(activity_id, stream_type)
+                stream_entity_id = model.Stream.make_key_string(activity_id, stream_type, resolution=resolution)
                 stream_record = model.Stream(id=stream_entity_id)
 
                 for key, value in stream.iteritems():
@@ -119,10 +127,10 @@ class UpdateHandler(BaseHandler):
         raise ndb.Return(result)
 
     @ndb.tasklet
-    def fetch_streams(self, activity_ids):
+    def fetch_streams(self, activity_ids, resolution=None):
         pending_stream_requests = {}
         for id in activity_ids:
-            f = self.arc.urlfetch(api_call('activities/{}/streams/latlng,altitude'.format(id)))
+            f = self.arc.urlfetch(api_call('activities/{}/streams/latlng,altitude'.format(id), resolution=resolution))
             pending_stream_requests[f] = id
 
         raise ndb.Return(pending_stream_requests)

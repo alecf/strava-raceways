@@ -18,14 +18,16 @@ class StreamsHandler(BaseHandler):
         streams_result = result['streams']
 
         activity_ids = self.request.GET.getall('activity_id')
+        resolution = self.request.get('resolution')
         stream_keys = []
         stream_types = []
         activity_ids2 = []
         for activity_id in activity_ids:
             streams_result[activity_id] = {}
             for type in ('latlng', 'altitude'):
-                stream_key = ndb.Key(model.Stream,
-                                      model.Stream.make_key_string(activity_id, type))
+                stream_key = ndb.Key(
+                    model.Stream,
+                    model.Stream.make_key_string(activity_id, type, resolution=resolution))
                 stream_keys.append(stream_key)
                 stream_types.append(type)
                 activity_ids2.append(activity_id)
