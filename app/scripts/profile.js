@@ -58,7 +58,19 @@ function accessor(attr) {
 
 // an object that represents the bounds of a map
 // note that there is no projection here
-function Bounds(stream_index) {
+function Bounds(activities) {
+    this.activities_ = activities;
+
+    this.ready_ = index_streams(activities)
+        .then(this.consume_index.bind(this));
+}
+
+Bounds.prototype.ready = function() {
+    return this.ready_;
+}
+
+// xxx need a better name
+Bounds.prototype.consume_index = function(stream_index) {
     var extents = {
         min_lat: d3.min(stream_index, function(d) { return d.domain.lat[0]; }),
         max_lat: d3.max(stream_index, function(d) { return d.domain.lat[1]; }),
@@ -108,12 +120,9 @@ Bounds.prototype.center = function() {
 }
 
 function drawmap(activities) {
-    return index_streams(activities).then(function(index) {
-        I = index;
-        var bounds = new Bounds(index);
-        console.log("have bounds", bounds);
-        B= bounds;
+    var bounds = new Bounds(activities);
 
+    bounds.ready().then(function() {
         draw2d(bounds, activities);
         draw3d(bounds, activities);
     });
