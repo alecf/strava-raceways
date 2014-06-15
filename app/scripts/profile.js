@@ -87,8 +87,13 @@ function Bounds(stream_index) {
 }
 
 Bounds.prototype.setSize = function(width, height) {
-    this.scale_x.range([0, width]);
-    this.scale_y.range([0, height]);
+    if (width > height) {
+        this.scale_x.range([0, height]);
+        this.scale_y.range([0, height]);
+    } else {
+        this.scale_x.range([0, width]);
+        this.scale_y.range([0, width]);
+    }
     this.scale_z.range([100, 200]); // lower number = darker = lower altitude
 };
 
@@ -183,10 +188,18 @@ function draw3d(bounds, activities) {
         center[axis] = (max[axis] - min[axis])/2;
     });
 
+    var vShader = document.querySelector('#vertexShader').innerText;
+    var fShader = document.querySelector('#fragmentShader').innerText;
+    var shaderMaterial =
+            new THREE.ShaderMaterial({
+                vertexShader:   vShader,
+                fragmentShader: fShader
+            });
+
     // backing plane for visual reference
     var planeGeometry = new THREE.PlaneGeometry( canvas.width, canvas.height );
     var planeMaterial = new THREE.MeshBasicMaterial( {color: 0xaaaaaa, side: THREE.DoubleSide} );
-    var plane = new THREE.Mesh( planeGeometry, planeMaterial );
+    var plane = new THREE.Mesh( planeGeometry, shaderMaterial );
     plane.position.x = canvas.width / 2;
     plane.position.y = canvas.height / 2;
     scene.add(plane);
@@ -549,7 +562,6 @@ FACETS.forEach(function(facet) {
 });
 
 function update_progress_indicator(waiting, complete) {
-    console.log("update_progress(", waiting, ", ", complete);
     if (waiting == complete)
         $('#progress').hide();
     else

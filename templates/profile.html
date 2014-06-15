@@ -40,27 +40,47 @@
 <script src="/scripts/third_party/three.min.js" defer></script>
 <script src="/scripts/third_party/OrbitControls.js" defer></script>
 <script src="/scripts/third_party/TrackballControls.js" defer></script>
-<script id="cubeVertexShader" type="x-shader/x-vertex">
-    uniform float time;
-    varying vec2 vUv;
- 
-    void main() {
-        vUv = uv;
-        vec3 newPosition = position + normal * vec3(sin(time * 0.2) * 3.0);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
-    }
+<script id="vertexShader" type="x-shader/x-vertex">
+// create a shared variable for the
+// VS and FS containing the normal
+varying vec3 vNormal;
+
+void main() {
+
+  // set the vNormal value with
+  // the attribute value passed
+  // in by Three.js
+  vNormal = normal;
+
+  gl_Position = projectionMatrix *
+                modelViewMatrix *
+                vec4(position, 1.0);
+}
 </script>
-<script id="cubeFragmentShader" type="x-shader/x-fragment">
-    uniform float time;
-    varying vec2 vUv;
-    
-    void main() {
-    vec2 position = -1.0 + 2.0 * vUv;
-    
-    float red = abs(sin(position.x * position.y + time / 5.0));
-    float green = abs(sin(position.x * position.y + time / 4.0));
-    float blue = abs(sin(position.x * position.y + time / 3.0 ));
-    gl_FragColor = vec4(red, green, blue, 1.0);
-    }
+<script id="fragmentShader" type="x-shader/x-fragment">
+// same name and type as VS
+varying vec3 vNormal;
+
+void main() {
+
+  // calc the dot product and clamp
+  // 0 -> 1 rather than -1 -> 1
+  vec3 light = vec3(0.5, 0.2, 1.0);
+
+  // ensure it's normalized
+  light = normalize(light);
+
+  // calculate the dot product of
+  // the light to the vertex normal
+  float dProd = max(0.0,
+                    dot(vNormal, light));
+
+  // feed into our frag colour
+  gl_FragColor = vec4(dProd, // R
+                      dProd, // G
+                      dProd, // B
+                      1.0);  // A
+
+}
 </script>
 {% endblock %}
