@@ -12,21 +12,14 @@ function get_stream(activity) {
 
 // generate metadata about all the streams
 function index_streams(activities) {
-    return new Promise(function(resolve, reject) {
-        var results = [];
-        for (var i = 0; i < activities.length; ++i) {
-            if (!activities[i].stream)
-                results.push(get_stream(activities[i]).then(index_stream));
-            else
-                results.push(index_stream(activities[i].stream));
-        }
-        Promise.all(results).then(function(stream_indexes) {
-            console.log("All streams ready! ", stream_indexes);
-            resolve(stream_indexes);
-        }).catch(function(ex) {
-            console.error("oops, rejected: ", ex);
-        });
-    });
+    var results = [];
+    for (var i = 0; i < activities.length; ++i) {
+        if (!activities[i].stream)
+            results.push(get_stream(activities[i]).then(index_stream));
+        else
+            results.push(index_stream(activities[i].stream));
+    }
+    return Promise.all(results);
 }
 
 // generate metadata about a single stream
@@ -99,13 +92,9 @@ Bounds.prototype.consume_index = function(stream_index) {
 }
 
 Bounds.prototype.setSize = function(width, height) {
-    if (width > height) {
-        this.scale_x.range([0, height]);
-        this.scale_y.range([0, height]);
-    } else {
-        this.scale_x.range([0, width]);
-        this.scale_y.range([0, width]);
-    }
+    var minSize = Math.min(width, height);
+    this.scale_x.range([0, minSize]);
+    this.scale_y.range([0, minSize]);
     this.scale_z.range([100, 200]); // lower number = darker = lower altitude
 };
 
@@ -204,14 +193,25 @@ function draw3d(bounds, activities) {
                 vertexShader:   vShader,
                 fragmentShader: fShader
             });
+    var lambertMaterial =
+            new THREE.MeshLambertMaterial( { color: 0xdddddd, shading: THREE.FlatShading } );
 
     // backing plane for visual reference
-    var planeGeometry = new THREE.PlaneGeometry( canvas.width, canvas.height );
+    var planeSize = Math.min(canvas.width, canvas.height);
+    // use planeSize when we correctly scale height/width
+    var planeGeometry = new THREE.PlaneGeometry( canvas.width, canvas.height);
     var planeMaterial = new THREE.MeshBasicMaterial( {color: 0xaaaaaa, side: THREE.DoubleSide} );
-    var plane = new THREE.Mesh( planeGeometry, shaderMaterial );
+    var plane = new THREE.Mesh( planeGeometry, lambertMaterial );
     plane.position.x = canvas.width / 2;
     plane.position.y = canvas.height / 2;
+    plane.position.z = 0;
     scene.add(plane);
+
+    var pointLight = new THREE.PointLight(0xffffff, 1);
+    pointLight.position.set(canvas.width, canvas.height, 300);
+	scene.add( new THREE.AmbientLight( 0x111111 ) );
+    scene.add( pointLight );
+
 
     REFPLANE = plane;
     CAMERA = camera;
