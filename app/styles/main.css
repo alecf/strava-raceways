@@ -2,6 +2,8 @@ body {
     background: #fafafa;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     color: #333;
+    margin: 0;
+    padding: 0;
 }
 
 .hero-unit {
@@ -28,8 +30,19 @@ body {
     padding: 0.2em 0;
 }
 
-.map-ui {
-    padding: 3px;
+.map-controls {
+    z-index: 10;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+}
+
+#map-3d {
+    z-index: 1;
+    position: fixed;
+    width: 100%;
+    left: 0px;
+    bottom: 0px;
 }
 
 ul.activity-list {
@@ -48,4 +61,12 @@ div.athlete {
     border-radius: 3px;
     margin: 10px;
     padding: 5px;
+}
+
+#progress {
+    position: absolute;
+    bottom: 0px;
+    right: 0px;
+    color: white;
+    z-index: 10;
 }

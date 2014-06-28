@@ -1,31 +1,40 @@
 
 // Get a stream and attach it to the activity.
-function get_stream(activity) {
+function load_stream(activity) {
     var activity_id = activity.activity_id;
+    if (activity.stream)
+        return Promise.resolve(activity);
     return XHR('/api/streams?activity_id=' + activity_id)
         .then(function(streams) {
             var stream = streams.result.streams[activity_id];
             activity.stream = stream;
-            return stream;
+            return activity;
         });
+}
+
+function load_streams(activities) {
+    var results = [];
+    for (var i = 0; i < activities.length; ++i) {
+        results.push(load_stream(activities[i]));
+    }
+    return Promise.all(results)
+        .then(function(e) { console.log("Streams loaded "); return e; });
 }
 
 // generate metadata about all the streams
 function index_streams(activities) {
     var results = [];
     for (var i = 0; i < activities.length; ++i) {
-        if (!activities[i].stream)
-            results.push(get_stream(activities[i]).then(index_stream));
-        else
-            results.push(index_stream(activities[i].stream));
+        results.push(index_stream(activities[i]));
     }
     return Promise.all(results);
 }
 
 // generate metadata about a single stream
-function index_stream(stream) {
+function index_stream(activity) {
+    var stream = activity.stream;
     if (!stream) {
-        return Promise.reject("Missing stream");
+        return Promise.reject(["Missing stream in ", activity]);
     }
     return new Promise(function(resolve, reject) {
         var metadata = {domain: {}};
@@ -53,9 +62,13 @@ function accessor(attr) {
 // note that there is no projection here
 function Bounds(activities) {
     this.activities_ = activities;
-
-    this.ready_ = index_streams(activities)
+    this.ready_ =
+        load_streams(activities)
+        .then(index_streams)
         .then(this.consume_index.bind(this));
+    this.ready_.catch(function(ex) {
+        console.error("Error loading and indexing: ", ex);
+    });
 }
 
 Bounds.prototype.ready = function() {
@@ -64,7 +77,8 @@ Bounds.prototype.ready = function() {
 
 // xxx need a better name
 Bounds.prototype.consume_index = function(stream_index) {
-    var extents = {
+    console.log("consuming index: ", stream_index);
+    var extents = this.extents_ = {
         min_lat: d3.min(stream_index, function(d) { return d.domain.lat[0]; }),
         max_lat: d3.max(stream_index, function(d) { return d.domain.lat[1]; }),
         min_lng: d3.min(stream_index, function(d) { return d.domain.lng[0]; }),
@@ -89,7 +103,70 @@ Bounds.prototype.consume_index = function(stream_index) {
     this.scale_y = d3.scale.linear().domain([this.y+this.height, this.y]);
     this.scale_z = d3.scale.linear().domain([extents.min_alt,
                                              extents.max_alt]);
-}
+
+    console.log("Trying to generate prox map");
+    this.generate_proximity_streams(20);
+};
+
+// adds a 'proximity' stream to each activity
+Bounds.prototype.generate_proximity_streams = function(n) {
+    // first index the 3d space
+    var bucket_x = this.scale_x.copy().rangeRound([0, n]).clamp(true);
+    var bucket_y = this.scale_y.copy().rangeRound([0, n]).clamp(true);
+    var bucket_z = this.scale_z.copy().rangeRound([0, n]).clamp(true);
+
+    var bucketCount = {};
+    function inc(lng,lat,alt,id) {
+        var x = bucket_x(lat);
+        var y = bucket_y(lng);
+        var z = bucket_z(alt);
+        if (!(x in bucketCount))
+            bucketCount[x] = {};
+        if (!(y in bucketCount[x]))
+            bucketCount[x][y] = {};
+        if (!(z in bucketCount[x][y]))
+            bucketCount[x][y][z] = d3.set();
+        bucketCount[x][y][z].add(id);
+    }
+    function val(lng, lat, alt) {
+        var x = bucket_x(lat);
+        var y = bucket_y(lng);
+        var z = bucket_z(alt);
+        return bucketCount[x][y][z].values().length;
+    }
+    console.log("Indexing 3d space: ", this.activities_);
+    // this is kind of a map-reduce style index: count up all
+    // lat/lng/altitude combos, then redistribute the counts out to
+    // each stream.
+    this.activities_.forEach(function(activity, index) {
+        activity.stream.altitude.data.forEach(function(altitude, i) {
+            var latlng = activity.stream.latlng.data[i];
+            inc(latlng[0], latlng[1], altitude, index);
+        });
+    });
+
+    var maxProximity = 0;
+    this.activities_.forEach(function(activity) {
+        activity.stream.proximity = {
+            data: []
+        };
+        var proximity = activity.stream.proximity.data;
+        activity.stream.altitude.data.forEach(function(altitude, i) {
+            var latlng = activity.stream.latlng.data[i];
+            var count = val(latlng[0], latlng[1], altitude);
+            maxProximity = Math.max(count, maxProximity);
+            proximity.push(count);
+        });
+    });
+
+    // we keep a max so that the proximity shapes have a size range;
+    this.maxProximity_ = maxProximity;
+
+    // we're throwing bucketCount away at this point, but could there
+    // be value in colorizing the space? i.e. visualizing a cloud in
+    // each bucket
+    this.bucketCount_ = bucketCount;
+};
 
 Bounds.prototype.setSize = function(width, height) {
     var minSize = Math.min(width, height);
@@ -108,13 +185,32 @@ Bounds.prototype.center = function() {
     return [lat_center, lng_center];
 }
 
-function drawmap(activities) {
+function render3d(render_context) {
+    render_context.controls.update();
+	render_context.renderer.render(render_context.scene, render_context.camera);
+    pending_render = false;
+}
+
+var pending_render = false;
+function render_loop(render_context) {
+    if (!pending_render)
+	    requestAnimationFrame(function() {
+            render3d(render_context);
+        });
+    pending_render = true;
+}
+
+/**
+ * Update the map
+ */
+function updatemap(render_context, activities) {
     var bounds = new Bounds(activities);
+    B = bounds;
 
     bounds.ready().then(function() {
-        draw2d(bounds, activities);
-        draw3d(bounds, activities);
-    });
+        updatescene(render_context, bounds, activities);
+        render_loop(render_context);
+    }).catch(function(ex) { console.error(ex); });
 }
 
 function Dataset() {
@@ -127,61 +223,113 @@ function Dataset() {
 
 Dataset.prototype.activities = function() {
     return this._pending_activities.then(function(activities) {
+        console.log("Have activities: ", activities);
         var r = run_filter(activities);
         console.log("Filtered to ", r.length, " activities");
         return r;
     });
 };
 
-function draw3d(bounds, activities) {
+/**
+ * Setup. Returns a "rendering context" that will need to also be
+ * populated with a scene and a camera.
+ */
+function init3d() {
     var canvas = document.querySelector('#map-3d');
 
-    bounds.setSize(canvas.width, canvas.height);
-    var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
+    var context = {
+        renderer: new THREE.WebGLRenderer({
+            canvas: canvas
+        })
+    };
+    return context;
+}
 
-    var scene = new THREE.Scene();
-    var camera = new THREE.PerspectiveCamera( 75, canvas.width / canvas.height, 0.1, 1000 );
-    var controls = new THREE.OrbitControls(camera, canvas);
+function updatescene(render_context, bounds, activities) {
+    var canvas = document.querySelector('#map-3d');
 
-    var renderer = new THREE.WebGLRenderer({
-        canvas: canvas
+    render_context.scene = new THREE.Scene();
+    render_context.camera = new THREE.PerspectiveCamera( 75, canvas.width / canvas.height, 0.1, 1000 );
+    render_context.controls = new THREE.OrbitControls(render_context.camera, canvas);
+    render_context.controls.addEventListener('change', function() {
+        // just redraw, don't recreate the scene
+        render_loop(render_context);
     });
+
+
+    bounds.setSize(canvas.width, canvas.height);
+    var proximityRadius = d3.scale.linear().domain([1, bounds.maxProximity_]);
+    proximityRadius.rangeRound([0, 4]);
+    console.log("proximityRaidus = ", proximityRadius);
+
+    var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
 
     var max_z = -1;
     var min_z = -1;
+    var totalspheres = 0;
     activities.forEach(function(activity, index) {
+        var lambertMaterial =
+                new THREE.MeshLambertMaterial( {
+                    color: color(index),
+                    shading: THREE.FlatShading
+                } );
+
         //console.log("drawing activity ", index, ": ", activity);
         var geometry = new THREE.Geometry();
+        var spherecount = 0;
         for (var i = 0; i < activity.stream.altitude.data.length; ++i) {
             var point = activity.stream.latlng.data[i];
             var altitude = activity.stream.altitude.data[i];
+            var proximity = activity.stream.proximity.data[i];
 
-            var x = Math.round(bounds.scale_x(point[1]));
-            var y = Math.round(bounds.scale_y(point[0]));
-            var z = Math.round(bounds.scale_z(altitude));
+            var x = bounds.scale_x(point[1]);
+            var y = bounds.scale_y(point[0]);
+            var z = bounds.scale_z(altitude);
 
             geometry.vertices.push(new THREE.Vector3(x, y, z));
+
+            // gad this is expensive
+            var radius = proximityRadius(proximity);
+            if (proximity > 1 &&
+                radius >= 1 &&
+                totalspheres < 2000 && // ugh artificial
+                !(i % 30)) {    //also artificial
+                spherecount++;
+                var sphere = new THREE.SphereGeometry(radius);
+                var sphereMesh = new THREE.Mesh(sphere,
+                                                lambertMaterial);
+
+                sphereMesh.position.set(x,y,z);
+                render_context.scene.add(sphereMesh);
+            }
         }
+        console.log("Activity ", index, " got ", spherecount, " spheres");
+        totalspheres += spherecount;
         var material = new THREE.LineBasicMaterial({
             color: color(index),
             linewidth: 2
         });
 
         geometry.computeBoundingBox();
-        console.log("  Bounding box:", geometry.boundingBox);
         var line = new THREE.Line(geometry, material);
-        scene.add(line);
+        render_context.scene.add(line);
     });
 
+    console.log("Total of ", totalspheres, " spheres");
     var min = {};
     var max = {};
     var center = {};
     ['x', 'y', 'z'].forEach(function(axis) {
-        max[axis] = d3.max(scene.children, function(child) {
-            return child.geometry.boundingBox.max[axis];
+        // super hack - we're using the fact that we haven't computed
+        // the bounding boxes for the spheres to filter them out and
+        // make this calcuation faster
+        max[axis] = d3.max(render_context.scene.children, function(child) {
+            if (child.geometry.boundingBox)
+                return child.geometry.boundingBox.max[axis];
         });
-        min[axis] = d3.min(scene.children, function(child) {
-            return child.geometry.boundingBox.min[axis];
+        min[axis] = d3.min(render_context.scene.children, function(child) {
+            if (child.geometry.boundingBox)
+                return child.geometry.boundingBox.min[axis];
         });
         center[axis] = (max[axis] - min[axis])/2;
     });
@@ -205,35 +353,24 @@ function draw3d(bounds, activities) {
     plane.position.x = canvas.width / 2;
     plane.position.y = canvas.height / 2;
     plane.position.z = 0;
-    scene.add(plane);
+    render_context.scene.add(plane);
 
     var pointLight = new THREE.PointLight(0xffffff, 1);
     pointLight.position.set(canvas.width, canvas.height, 300);
-	scene.add( new THREE.AmbientLight( 0x111111 ) );
-    scene.add( pointLight );
+	render_context.scene.add( new THREE.AmbientLight( 0x111111 ) );
+    render_context.scene.add( pointLight );
 
 
     REFPLANE = plane;
-    CAMERA = camera;
-    SCENE = scene;
 
     var x_center = (max.x-min.x)/2;
     var y_center = (max.y-min.y)/2;
     var z_center = (max.z-min.z)/2;
-    camera.position.set(0, 0, max.z);
-    controls.target.set(center.x, center.y, 0);
+    render_context.camera.position.set(0, 0, max.z);
+    render_context.controls.target.set(center.x, center.y, 0);
     //camera.lookAt(center.x, center.y, center.z);
 
-    function render() {
-	    requestAnimationFrame(render);
-        controls.update();
-	    renderer.render(scene, camera);
-    }
-    console.log("Kicking off render with ", scene, camera);
-    render();
-
-
-
+    console.log("Kicking off render with ", render_context.scene, render_context.camera);
 }
 
 function draw2d(bounds, activities) {
@@ -489,9 +626,11 @@ function xhrContext(progress) {
     };
 }
 
-function refresh() {
+function refresh(render_context) {
     console.log("refreshing..");
-    return D.activities().then(drawmap).catch(function(ex) { console.error(ex); });
+    return D.activities().then(function(activities) {
+        updatemap(render_context, activities);
+    }).catch(function(ex) { console.error(ex); });
 }
 
 // given a keylist like ['foo', 'bar'] extracts the corresponding
@@ -541,7 +680,7 @@ function display_value(value, count) {
     return value + " (" + count + ")";
 }
 
-FACETS = [
+var FACETS = [
     { name: 'Location',
       id: 'location',
       key: ['location_city', 'location_state', 'location_country'],
@@ -565,7 +704,7 @@ FACETS = [
     }
 ];
 
-FACETS_BY_ID = {};
+var FACETS_BY_ID = {};
 FACETS.forEach(function(facet) {
     FACETS_BY_ID[facet.id] = facet;
 });
@@ -574,7 +713,7 @@ function update_progress_indicator(waiting, complete) {
     if (waiting == complete)
         $('#progress').hide();
     else
-        $('#progress').show().text(complete*100/waiting + "%");
+        $('#progress').show().text(Math.floor(complete*100/waiting) + "%");
 }
 
 function init() {
@@ -611,17 +750,20 @@ function init() {
         // extract all visible keys
     });
 
+    var context = init3d();
+    refresh(context);
+
     var controls = document.querySelectorAll('.map-control polymer-ui-tabs');
     for (var i = 0; i < controls.length; ++i) {
         if (!controls[i].hasEventListener) {
-            controls[i].addEventListener('polymer-activate', refresh);
+            controls[i].addEventListener('polymer-activate', function() {
+                refresh(context);
+            });
             controls[i].hasEventListener = true;
         }
     }
 
-    refresh();
 }
 
-// hack hack
 document.addEventListener('WebComponentsReady', init);
 console.log("profile.js loaded, should be calling other stuff");

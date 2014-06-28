@@ -2,8 +2,8 @@
 {% block title %}Welcome{% endblock%}
 {% block content %}
 {{util.athlete_profile(athlete)}}
-<div class="map-ui">
-    <div id="progress"></div>
+<div id="progress"></div>
+<div class="map-controls">
     <div class="map-control map-type" properties='["type"]'>Type:
         <polymer-ui-tabs class="facet-type" valueattr="value" selected="*">
             <span class="tab" value="*">All</span>
@@ -19,17 +19,8 @@
             <span class="tab" value="*">All</span>
         </polymer-ui-tabs>
     </div>
-    <div>
-        <div>In 3d:</div>
-        <canvas id="map-3d" width="800" height="400"></canvas>
-    </div>
-    <div>
-        <div>In 2d:</div>
-        <canvas id="map" width="400" height="400"></canvas>
-    </div>
 </div>
-<ul class="activity-list">
-</ul>
+<canvas id="map-3d" width="800" height="400"></canvas>
 <script type="text/javascript" defer async>
     var athlete = {{json.dumps(athlete, indent=4, sort_keys=True)|safe}}
 </script>
