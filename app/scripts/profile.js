@@ -90,9 +90,9 @@ Bounds.prototype.consume_index = function(stream_index) {
 
     var padding_x = (extents.max_lng - extents.min_lng) * 0.1;
     var padding_y = (extents.max_lat - extents.min_lat) * 0.1;
-    this.x = extents.min_lng - padding_x;
+    this.x = extents.max_lng - padding_x;
     this.y = extents.min_lat - padding_y;
-    this.width = extents.max_lng - extents.min_lng + 2*padding_x;
+    this.width = extents.min_lng - extents.max_lng + 2*padding_x;
     this.height = extents.max_lat - extents.min_lat + 2*padding_y;
 
     // todo: use a projection to make sure the x/y are scaled
@@ -100,6 +100,7 @@ Bounds.prototype.consume_index = function(stream_index) {
     // looks fine at my latitude.
 
     this.scale_x = d3.scale.linear().domain([this.x, this.x+this.width]);
+    console.log("scale_x = ", this.scale_x);
     this.scale_y = d3.scale.linear().domain([this.y+this.height, this.y]);
     this.scale_z = d3.scale.linear().domain([extents.min_alt,
                                              extents.max_alt]);
@@ -240,33 +241,40 @@ function init3d() {
     var context = {
         renderer: new THREE.WebGLRenderer({
             canvas: canvas
-        })
+        }),
+        canvas: canvas,
+        height: 300,
+        width: 400,
     };
     return context;
 }
 
+function updatesize(render_context) {
+}
+
 function updatescene(render_context, bounds, activities) {
-    var canvas = document.querySelector('#map-3d');
 
-    render_context.scene = new THREE.Scene();
-    render_context.camera = new THREE.PerspectiveCamera( 75, canvas.width / canvas.height, 0.1, 1000 );
-    render_context.controls = new THREE.OrbitControls(render_context.camera, canvas);
-    render_context.controls.addEventListener('change', function() {
-        // just redraw, don't recreate the scene
-        render_loop(render_context);
-    });
-
-
-    bounds.setSize(canvas.width, canvas.height);
+    if (!render_context.camera) {
+        render_context.camera =
+            new THREE.PerspectiveCamera( 75,
+                                         render_context.width / render_context.height, 0.1, 1000 );
+        render_context.controls = new THREE.OrbitControls(render_context.camera, render_context.canvas);
+        render_context.camera.up.set(0,0,1);
+        render_context.controls.addEventListener('change', function() {
+            // just redraw, don't recreate the scene
+            render_loop(render_context);
+        });
+    }
+    bounds.setSize(render_context.width, render_context.height);
     var proximityRadius = d3.scale.linear().domain([1, bounds.maxProximity_]);
     proximityRadius.rangeRound([0, 4]);
-    console.log("proximityRaidus = ", proximityRadius);
 
     var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
 
     var max_z = -1;
     var min_z = -1;
     var totalspheres = 0;
+    render_context.scene = new THREE.Scene();
     activities.forEach(function(activity, index) {
         var lambertMaterial =
                 new THREE.MeshLambertMaterial( {
@@ -345,53 +353,50 @@ function updatescene(render_context, bounds, activities) {
             new THREE.MeshLambertMaterial( { color: 0xdddddd, shading: THREE.FlatShading } );
 
     // backing plane for visual reference
-    var planeSize = Math.min(canvas.width, canvas.height);
+    var planeSize = Math.min(render_context.width, render_context.height);
     // use planeSize when we correctly scale height/width
-    var planeGeometry = new THREE.PlaneGeometry( canvas.width, canvas.height);
+    var planeGeometry = new THREE.PlaneGeometry( render_context.width, render_context.height);
     var planeMaterial = new THREE.MeshBasicMaterial( {color: 0xaaaaaa, side: THREE.DoubleSide} );
     var plane = new THREE.Mesh( planeGeometry, lambertMaterial );
-    plane.position.x = canvas.width / 2;
-    plane.position.y = canvas.height / 2;
+    plane.position.x = render_context.width / 2;
+    plane.position.y = render_context.height / 2;
     plane.position.z = 0;
     render_context.scene.add(plane);
 
     var pointLight = new THREE.PointLight(0xffffff, 1);
-    pointLight.position.set(canvas.width, canvas.height, 300);
+    pointLight.position.set(render_context.width, render_context.height, 300);
 	render_context.scene.add( new THREE.AmbientLight( 0x111111 ) );
     render_context.scene.add( pointLight );
 
 
     REFPLANE = plane;
 
-    var x_center = (max.x-min.x)/2;
-    var y_center = (max.y-min.y)/2;
-    var z_center = (max.z-min.z)/2;
-    render_context.camera.position.set(0, 0, max.z);
-    render_context.controls.target.set(center.x, center.y, 0);
+    render_context.camera.position.set(center.x, max.y*2, max.z);
+    render_context.controls.target.set(center.x, center.y, center.z);
     //camera.lookAt(center.x, center.y, center.z);
 
     console.log("Kicking off render with ", render_context.scene, render_context.camera);
 }
 
-function draw2d(bounds, activities) {
+function draw2d(bounds, activities, width, height) {
     var canvas = document.querySelector('#map');
 
-    bounds.setSize(canvas.width, canvas.height);
+    bounds.setSize(width, height);
 
     var center = bounds.center();
 
     var projection = d3.geo.transverseMercator()
-            .translate(canvas.width / 2, canvas.height/2)
-            .scale(canvas.width * 100) // ???
+            .translate(render_context.width / 2, render_context.height/2)
+            .scale(width * 100) // ???
             .rotate(center)           // supposed to be the central meridian?
             .center(center);
 
     var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
     var ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width, canvas.height);
+    ctx.clearRect(0,0,width, height);
 
     // draw altitude gradients first - this is terribly inefficient
-    var gradientRadius = canvas.width * 0.02;
+    var gradientRadius = width * 0.02;
     var gradientCache = {};
     for (var i = 0; i < activities.length; ++i) {
         if (!activities[i].stream)
@@ -752,6 +757,7 @@ function init() {
 
     var context = init3d();
     refresh(context);
+    C = context;
 
     var controls = document.querySelectorAll('.map-control polymer-ui-tabs');
     for (var i = 0; i < controls.length; ++i) {
