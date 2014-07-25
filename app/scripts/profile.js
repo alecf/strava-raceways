@@ -258,6 +258,14 @@ function updatescene(render_context, bounds, activities) {
         render_context.camera =
             new THREE.PerspectiveCamera( 75,
                                          render_context.width / render_context.height, 0.1, 1000 );
+        // Create an event listener that resizes the renderer with the browser window.
+        window.addEventListener('resize', function() {
+            var WIDTH = window.innerWidth,
+                HEIGHT = window.innerHeight;
+            render_context.renderer.setSize(WIDTH, HEIGHT);
+            render_context.camera.aspect = WIDTH / HEIGHT;
+            render_context.camera.updateProjectionMatrix();
+        });
         render_context.controls = new THREE.OrbitControls(render_context.camera, render_context.canvas);
         render_context.camera.up.set(0,0,1);
         render_context.controls.addEventListener('change', function() {
@@ -370,10 +378,10 @@ function updatescene(render_context, bounds, activities) {
 
 
     REFPLANE = plane;
-
-    render_context.camera.position.set(center.x, max.y*2, max.z);
+    console.log("Setting camera at ", center.x, max.y*1.5, max.z);
+    render_context.camera.position.set(center.x, max.y*1.5, max.z);
     render_context.controls.target.set(center.x, center.y, center.z);
-    //camera.lookAt(center.x, center.y, center.z);
+    render_context.camera.lookAt(center.x, center.y, center.z);
 
     console.log("Kicking off render with ", render_context.scene, render_context.camera);
 }
