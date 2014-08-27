@@ -4,12 +4,11 @@
   "dependencies": {
     "platform": "Polymer/platform#master",
     "polymer": "Polymer/polymer#master",
-    "polymer-ui-elements": "~0.2.1"
+    "polymer-ui-elements": "~0.2.1",
+    "jquery": "~2.1.1"
   },
   "devDependencies": {},
   "resolutions": {
-    "core-component-page": "0.2.2",
-    "core-action-icons": "0.2.2",
     "platform": "0.2.2",
     "polymer": "0.2.2"
   }
