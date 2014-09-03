@@ -779,5 +779,5 @@ function init() {
 
 }
 
-document.addEventListener('WebComponentsReady', init);
+window.addEventListener('polymer-ready', init);
 console.log("profile.js loaded, should be calling other stuff");
