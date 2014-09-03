@@ -3,6 +3,7 @@ import webapp2
 import httplib2
 from stravalib import unithelper
 from functools import wraps
+from datetime import datetime
 import time
 import json
 import traceback
@@ -41,16 +42,15 @@ def using_template(template_name):
     return call_wrapper
 
 def json_default_encode(o):
-   try:
-       iterable = iter(o)
-   except TypeError:
-       pass
-   else:
-       return list(iterable)
+   # try:
+   #     iterable = iter(o)
+   # except TypeError:
+   #     pass
+   # else:
+   #     return list(iterable)
    if isinstance(o, datetime):
        return o.isoformat()
-   # Let the base class default method raise the TypeError
-   return JSONEncoder.default(o)
+   raise TypeError('Unknown object %r' % o)
 
 def api_handler(f):
     @wraps(f)

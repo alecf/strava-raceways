@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Welcome{% endblock%}
 {% block content %}
-{#{{util.athlete_profile(athlete)}}#}
 <div id="progress"></div>
 <div class="map-controls">
     <div class="map-control"><polymer-ui-icon-button icon="refresh" id="refresh-button"></button></div>
@@ -27,10 +26,10 @@
 </script>
 <script src="/scripts/eventloop.js" async></script>
 <script src="/scripts/profile.js" async></script>
-<script src="/scripts/third_party/d3.v3.min.js" async></script>
-<script src="/scripts/third_party/colorbrewer.js" async></script>
-<script src="/scripts/third_party/three.min.js" defer></script>
-<script src="/scripts/third_party/OrbitControls.js" defer></script>
+<script src="/bower_components/d3/d3.min.js" async></script>
+<script src="/bower_components/colorbrewer/colorbrewer.js" async></script>
+<script src="/bower_components/threejs/build/three.min.js" defer></script>
+<script src="/bower_components/three.js-controls/src/OrbitControls.js" defer></script>
 <script id="vertexShader" type="x-shader/x-vertex">
 // create a shared variable for the
 // VS and FS containing the normal
