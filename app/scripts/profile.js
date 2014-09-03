@@ -260,10 +260,9 @@ function updatescene(render_context, bounds, activities) {
                                          render_context.width / render_context.height, 0.1, 1000 );
         // Create an event listener that resizes the renderer with the browser window.
         window.addEventListener('resize', function() {
-            var WIDTH = window.innerWidth,
-                HEIGHT = window.innerHeight;
-            render_context.renderer.setSize(WIDTH, HEIGHT);
-            render_context.camera.aspect = WIDTH / HEIGHT;
+            var rect = render_context.canvas.getBoundingClientRect();
+            //render_context.renderer.setSize(WIDTH, HEIGHT);
+            render_context.camera.aspect = rect.width / rect.height;
             render_context.camera.updateProjectionMatrix();
         });
         render_context.controls = new THREE.OrbitControls(render_context.camera, render_context.canvas);
@@ -273,7 +272,7 @@ function updatescene(render_context, bounds, activities) {
             render_loop(render_context);
         });
     }
-    bounds.setSize(render_context.width, render_context.height);
+    bounds.setSize(render_context.canvas.width, render_context.canvas.height);
     var proximityRadius = d3.scale.linear().domain([1, bounds.maxProximity_]);
     proximityRadius.rangeRound([0, 4]);
 
@@ -384,70 +383,6 @@ function updatescene(render_context, bounds, activities) {
     render_context.camera.lookAt(center.x, center.y, center.z);
 
     console.log("Kicking off render with ", render_context.scene, render_context.camera);
-}
-
-function draw2d(bounds, activities, width, height) {
-    var canvas = document.querySelector('#map');
-
-    bounds.setSize(width, height);
-
-    var center = bounds.center();
-
-    var projection = d3.geo.transverseMercator()
-            .translate(render_context.width / 2, render_context.height/2)
-            .scale(width * 100) // ???
-            .rotate(center)           // supposed to be the central meridian?
-            .center(center);
-
-    var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
-    var ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,width, height);
-
-    // draw altitude gradients first - this is terribly inefficient
-    var gradientRadius = width * 0.02;
-    var gradientCache = {};
-    for (var i = 0; i < activities.length; ++i) {
-        if (!activities[i].stream)
-            continue;
-        for (var j = 0; j < activities[i].stream.altitude.data.length; ++j) {
-            var point = activities[i].stream.latlng.data[j];
-            var altitude = activities[i].stream.altitude.data[j];
-            var x = Math.round(bounds.scale_x(point[1]));
-            var y = Math.round(bounds.scale_y(point[0]));
-            var z = Math.round(bounds.scale_z(altitude));
-            var zcolor = z + ',' + z + ',' + z;
-
-            var gradient = gradientCache[x + "," + y + "," + z];
-            if (gradient) continue;
-            if (!gradient) {
-                //console.log("creating gradient for ", x, y);
-                gradient = ctx.createRadialGradient(x,y,1,x,y,gradientRadius);
-                gradient.addColorStop(0, 'rgba(' + zcolor + ',.90)');
-                gradient.addColorStop(1, 'rgba(' + zcolor + ',0)');
-                gradientCache[x + "," + y + ',' + z] = gradient;
-            }
-            ctx.fillStyle = gradient;
-            ctx.fillRect(x-gradientRadius,y-gradientRadius,x+gradientRadius,y+gradientRadius);
-        }
-    }
-
-    for (var i = 0; i < activities.length; ++i) {
-        if (!activities[i].stream)
-            continue;
-        ctx.strokeStyle = color(i);
-        ctx.beginPath();
-        var stream = activities[i].stream.latlng;
-        var last_point = stream.data[0];
-        ctx.moveTo(bounds.scale_x(last_point[1]),
-                   bounds.scale_y(last_point[0]));
-        console.log("Drawing ", stream.data.length, " points");
-        for (var j = 1; j < stream.data.length; ++j) {
-            var point = stream.data[j];
-            ctx.lineTo(bounds.scale_x(point[1]),
-                       bounds.scale_y(point[0]));
-        }
-        ctx.stroke();
-    }
 }
 
 // creates a filter from the UI controls, where the filter is in the form
@@ -730,6 +665,8 @@ function update_progress_indicator(waiting, complete) {
 }
 
 function init() {
+    console.log("init()!");
+    document.querySelector('#main').responsiveWidth = "1000px";
     XHR = xhrContext(update_progress_indicator);
 
     D = new Dataset();
@@ -779,5 +716,9 @@ function init() {
 
 }
 
-window.addEventListener('polymer-ready', init);
+if (document.body.hasAttribute('unresolved')) {
+    window.addEventListener('polymer-ready', init);
+} else {
+    Promise.resolve().then(init);
+}
 console.log("profile.js loaded, should be calling other stuff");

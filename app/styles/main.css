@@ -37,17 +37,17 @@ body {
 
 .map-controls {
     z-index: 10;
-    position: absolute;
+/*    position: absolute; */
     top: 0px;
     left: 0px;
 }
 
 #map-3d {
-    z-index: 1;
-    position: fixed;
-    width: 100%;
-    left: 0px;
-    bottom: 0px;
+    /* z-index: 1; */
+    /* position: fixed; */
+    /* width: 100%; */
+    /* left: 0px; */
+    /* bottom: 0px; */
 }
 
 ul.activity-list {
@@ -69,9 +69,17 @@ div.athlete {
 }
 
 #progress {
+    /* position: absolute; */
+    /* bottom: 0px; */
+    /* right: 0px; */
+    /* color: white; */
+    /* z-index: 10; */
+}
+
+.content {
     position: absolute;
-    bottom: 0px;
+    top: 0px;
     right: 0px;
-    color: white;
-    z-index: 10;
+    left: 0px;
+    bottom: 0px;
 }
