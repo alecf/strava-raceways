@@ -717,8 +717,10 @@ function init() {
 }
 
 if (document.body.hasAttribute('unresolved')) {
+    console.log("Waiting for polymer-ready");
     window.addEventListener('polymer-ready', init);
 } else {
+    console.log("Polymer already ready..");
     Promise.resolve().then(init);
 }
 console.log("profile.js loaded, should be calling other stuff");
