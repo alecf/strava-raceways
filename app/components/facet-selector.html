@@ -1,0 +1,33 @@
+<link rel="import" href="../bower_components/polymer/polymer.html">
+
+<polymer-element name="facet-selector">
+  <template>
+    <div>{{facet.name}}</div>
+    <div class="row">
+        All
+    </div>
+    <core-list data="{{values}}">
+      <template>
+        <div class="row {{ {selected: selected} | tokenList }}">
+          {{model.name}} ({{model.count}})
+        </div>
+      </template>
+    </core-list>
+  </template>
+        
+  <script type="text/javascript">
+   Polymer({
+     publish: {
+       facet: {
+         name: ''
+         id: ''
+       },
+       values: [{
+         name: '',
+           id: '',
+         count: 0,
+       }],
+     }
+   });  
+  </script>
+</polymer-element>

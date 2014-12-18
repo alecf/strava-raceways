@@ -8,9 +8,7 @@ from functools import wraps
 def api_handler(f):
     @wraps(f)
     def wrapper(self, *args, **kwds):
-        print "Running wrapper"
         result = f(self, *args, **kwds)
-        print "wrapper done"
         
         self.response.cache_control.max_age = 30
         self.response.cache_control.no_cache = False

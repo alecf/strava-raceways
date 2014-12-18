@@ -1,0 +1,25 @@
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../components/facet-selector/facet-selector.html">
+
+
+<polymer-element name="facet-list">
+  <template>
+    <template repeat="{{facet in facets}}">
+      <facet-selector facet="{{facet.facet}}" values="{{facet.values}}"
+                      on-facet-value="{{onFacetValue}}">
+      </facet-selector>
+    </template>
+  </template>
+  <script>
+   Polymer({
+     publish: { facets: [] },
+     selectors: function() {
+       return this.shadowRoot.querySelectorAll('facet-selector');
+     },
+     onFacetValue: function(e) {
+       console.log("onFacetValue(", e, ")");
+     },
+   });
+  </script>
+</polymer-element>
+        

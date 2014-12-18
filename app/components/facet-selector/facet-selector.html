@@ -1,0 +1,68 @@
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../bower_components/core-menu/core-menu.html">
+<link rel="import" href="../../bower_components/core-item/core-item.html">
+
+<polymer-element name="facet-selector">
+  <template>
+    <h2>{{facet.name}} ({{values.length}})</h2>
+    <core-menu id="list" on-core-select="{{valueSelected}}">
+      <template repeat="{{value in values}}">
+        <core-item>
+          {{value.name}} ({{value.count}})
+        </core-item>
+      </template>
+    </core-menu>
+  </template>
+        
+  <script type="text/javascript">
+   Polymer({
+     publish: {
+       facet: {
+         name: '',
+         id: '',
+       },
+       values: [],
+     },
+     filters: function() {
+       var results = [];
+       var valueItems = this.shadowRoot.querySelectorAll('core-item');
+       for (var i=0; i < valueItems.length; i++) {
+         console.log("Checking ", valueItems[i]);
+         var dataItem = valueItems[i].templateInstance.model.value
+       }
+       
+       return results;
+     },
+
+     filterValues: function() {
+       var results = [];
+       var coreItems = this.shadowRoot.querySelectorAll('core-item');
+       for (var i=0; i < coreItems.length; i++) {
+         var coreItem = coreItems[i];
+         console.log("Checking ", coreItem);
+         var dataItem = coreItem.templateInstance.model.value;
+         // surely there's a better way to test selection?
+         if (coreItem.classList.contains('core-selected')) {
+           results.push([dataItem.id, dataItem.value]);
+         }
+       }
+
+       return results;
+     },
+     valueSelected: function(e) {
+       console.log("Value selected:", e);
+       var model = e.detail.item.templateInstance.model;
+       e.stopPropagation();
+       var facetEvent = new CustomEvent('facet-value');
+       facetEvent.facet = model.facet;
+       // this is a bit of a hack
+       try {
+         facetEvent.value = model.value;
+         this.dispatchEvent(facetEvent);
+       } catch(ex) {
+         console.error("Oops, bad value in .value? ", model.value, ": ", e);
+       }
+     },
+   });  
+  </script>
+</polymer-element>

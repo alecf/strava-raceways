@@ -41,5 +41,7 @@ class StreamsHandler(BaseHandler):
             else:
                 activity[stream_type] = stream.to_dict()
 
-        self.response.cache_expires(60)
+        # self.response.cache_expires(60*60)
+        # self.response.cache_control = 'private'
+        # self.response.vary = 'Cookie'
         raise ndb.Return(result)

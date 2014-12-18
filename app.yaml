@@ -25,6 +25,8 @@ handlers:
   static_dir: app/styles
 - url: /images
   static_dir: app/images
+- url: /components
+  static_dir: app/components
 - url: /scripts
   static_dir: app/scripts
 - url: /bower_components

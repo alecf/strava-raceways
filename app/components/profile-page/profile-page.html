@@ -1,0 +1,50 @@
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../bower_components/core-ajax/core-ajax.html">
+<link rel="import" href="../../bower_components/core-drawer-panel/core-drawer-panel.html">
+<link rel="import" href="../../bower_components/core-header-panel/core-header-panel.html">
+<link rel="import" href="../../bower_components/core-icon-button/core-icon-button.html">
+<link rel="import" href="../../bower_components/core-item/core-item.html">
+<link rel="import" href="../../bower_components/core-menu/core-menu.html">
+<link rel="import" href="../../bower_components/core-scaffold/core-scaffold.html">
+<link rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="../../bower_components/paper-tabs/paper-tabs.html">
+<link rel="import" href="../facet-selector/facet-selector.html">
+<link rel="import" href="../facet-list/facet-list.html">
+
+<polymer-element name="profile-page">
+  <template>
+    <core-scaffold responsiveWidth="1000px">
+      <core-header-panel navigation fit layout vertical>
+        <div id="progress"></div>
+        <div>Navigation here!</div>
+        <facet-list id="facet_list" on-facet-value="{{facetSelected}}">
+        </facet-list>
+      </core-header-panel>
+
+      <span tool flex>Strava Raceways</span>
+      <paper-icon-button tool icon="refresh" id="refresh-button">
+      </paper-icon-button>
+      
+      <div layout vertical fit>
+        <canvas id="map-3d" width="800" height="400" flex></canvas>
+      </div>
+    </core-scaffold>
+    <core-ajax id="refresh-data" url="/api/update" handleAs="json"></core-ajax>
+  </template>
+  <script>
+   Polymer({
+     'facetSelected': function(e) {
+       console.log("Filters should be updated with ", e.facet.id, " = ", e.value.value);
+     },
+     'ready': function() {
+       console.log("profile-page ready");
+
+       /* this.$.sample.facet.name = 'City';
+          this.$.sample.values.push({name: "Berkeley", count: 100});
+          this.addEventListener('core-select', function(e, detail, ex) {
+          console.log("Selected: ", this, ": ", e, detail, ex);
+          }); */
+     },
+   });
+  </script>
+</polymer-element>

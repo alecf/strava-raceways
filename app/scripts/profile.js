@@ -1,5 +1,7 @@
 
-// Get a stream and attach it to the activity.
+// Get a stream and attach it to the activity. Returns a promise that
+// resolves to a copy of the activity, and a 'stream' property with
+// stream data.
 function load_stream(activity) {
     var activity_id = activity.activity_id;
     if (activity.stream)
@@ -12,6 +14,7 @@ function load_stream(activity) {
         });
 }
 
+// Returns a promise that resolves the an array of all activities
 function load_streams(activities) {
     var results = [];
     for (var i = 0; i < activities.length; ++i) {
@@ -30,7 +33,7 @@ function index_streams(activities) {
     return Promise.all(results);
 }
 
-// generate metadata about a single stream
+// generate metadata about a single stream. Returns a promise of the data
 function index_stream(activity) {
     var stream = activity.stream;
     if (!stream) {
@@ -77,7 +80,6 @@ Bounds.prototype.ready = function() {
 
 // xxx need a better name
 Bounds.prototype.consume_index = function(stream_index) {
-    console.log("consuming index: ", stream_index);
     var extents = this.extents_ = {
         min_lat: d3.min(stream_index, function(d) { return d.domain.lat[0]; }),
         max_lat: d3.max(stream_index, function(d) { return d.domain.lat[1]; }),
@@ -86,7 +88,6 @@ Bounds.prototype.consume_index = function(stream_index) {
         min_alt: d3.min(stream_index, function(d) { return d.domain.alt[0]; }),
         max_alt: d3.max(stream_index, function(d) { return d.domain.alt[1]; }),
     };
-    console.log("Now have extents = ", extents);
 
     var padding_x = (extents.max_lng - extents.min_lng) * 0.1;
     var padding_y = (extents.max_lat - extents.min_lat) * 0.1;
@@ -105,7 +106,6 @@ Bounds.prototype.consume_index = function(stream_index) {
     this.scale_z = d3.scale.linear().domain([extents.min_alt,
                                              extents.max_alt]);
 
-    console.log("Trying to generate prox map");
     this.generate_proximity_streams(20);
 };
 
@@ -135,7 +135,6 @@ Bounds.prototype.generate_proximity_streams = function(n) {
         var z = bucket_z(alt);
         return bucketCount[x][y][z].values().length;
     }
-    console.log("Indexing 3d space: ", this.activities_);
     // this is kind of a map-reduce style index: count up all
     // lat/lng/altitude combos, then redistribute the counts out to
     // each stream.
@@ -222,11 +221,14 @@ function Dataset() {
         });
 }
 
+Dataset.prototype.raw_activities = function() {
+    return this._pending_activities;
+};
+
 Dataset.prototype.activities = function() {
     return this._pending_activities.then(function(activities) {
-        console.log("Have activities: ", activities);
         var r = run_filter(activities);
-        console.log("Filtered to ", r.length, " activities");
+        //console.log("Filtered to ", r.length, " activities");
         return r;
     });
 };
@@ -235,8 +237,9 @@ Dataset.prototype.activities = function() {
  * Setup. Returns a "rendering context" that will need to also be
  * populated with a scene and a camera.
  */
-function init3d() {
-    var canvas = document.querySelector('#map-3d');
+function init3d(profile_page) {
+    console.log("Ready with canvas on ", profile_page);
+    var canvas = profile_page.$['map-3d'];
 
     var context = {
         renderer: new THREE.WebGLRenderer({
@@ -318,7 +321,7 @@ function updatescene(render_context, bounds, activities) {
                 render_context.scene.add(sphereMesh);
             }
         }
-        console.log("Activity ", index, " got ", spherecount, " spheres");
+        //console.log("Activity ", index, " got ", spherecount, " spheres");
         totalspheres += spherecount;
         var material = new THREE.LineBasicMaterial({
             color: color(index),
@@ -330,7 +333,7 @@ function updatescene(render_context, bounds, activities) {
         render_context.scene.add(line);
     });
 
-    console.log("Total of ", totalspheres, " spheres");
+    //console.log("Total of ", totalspheres, " spheres");
     var min = {};
     var max = {};
     var center = {};
@@ -382,51 +385,70 @@ function updatescene(render_context, bounds, activities) {
     render_context.controls.target.set(center.x, center.y, center.z);
     render_context.camera.lookAt(center.x, center.y, center.z);
 
-    console.log("Kicking off render with ", render_context.scene, render_context.camera);
+    //console.log("Kicking off render with ", render_context.scene, render_context.camera);
 }
 
 // creates a filter from the UI controls, where the filter is in the form
 // [[key, value], [key, value]]
 function make_filters() {
-    var test_value = [];
-    var test_facet = [];
+    var results = [];
 
+
+    //return [test_value, test_facet];
     // generate filter
-    var controls = document.querySelectorAll('.map-control');
-    for (var i = 0; i < controls.length; ++i) {
-        var properties = JSON.parse(controls[i].getAttribute('properties'));
-        var criteria = controls[i].querySelectorAll('span.tab');
-        for (var j = 0; j < criteria.length; j++) {
-            var criterium = criteria[j];
-            if (criterium.classList.contains('polymer-selected')) {
-                var value = criterium.getAttribute('value');
-                var facet_id = criterium.getAttribute('facet');
-                var facet = FACETS_BY_ID[facet_id];
-                if (value != '*') {
-                    console.log("Trying to extract using ", facet.key, " and ", value);
-                    // note that the facets contain the already-extracted values
-                    value = JSON.parse(value);
-                    console.log("And value has become ", value);
-                    test_value.push(value);
-                    test_facet.push(facet);
-                    console.log("I need to check for ", properties, ' = ', value, ' using ', facet);
-                }
-            }
-        }
-    }
+    var profilePage = document.querySelector('#main');
+    var controls = profilePage.$.map_controls;
+    var facet_list = profilePage.$.facet_list;
+    console.log("List is here: ", facet_list, " with selectors: ", facet_list.selectors().length);
+    FL = facet_list;
+    var selectors = facet_list.selectors();
+    for (var i = 0; i < selectors.length; i++) {
+        var selector = selectors[i];
+        console.log("Looking at selector: ", selector);
 
-    return [test_value, test_facet];
+        var filters = selector.filterValues();
+        results = results.concat(filters);
+    }
+    return results;
 }
 
 function run_filter(activities) {
-    var filter_params = make_filters();
+    var result = [];
+    var filters = make_filters();
+    console.log("Runnning filters against ", filters);
+    for (var i = 0; i < activities.length; i++) {
+        var activity = activities[i];
+        var matches = true;
+        for (var j = 0; j < filters.length; j++) {
+            var filter = filters[j];
+            var facet_id = filter[0];
+            var facet_value = filter[1];
+
+            var facet = FACETS_BY_ID[facet_id];
+            var activity_value = facet.extract(facet.key, activity);
+            if (!facet.matches(facet_value, activity_value)) {
+                matches = false;
+                break;
+            }
+        }
+
+        if (matches) {
+            result.push(activity);
+        }
+    }
+    return result;
+}
+
+/*
+function run_filter(activities) {
+    var filter_params = make_filters()[0];
     var match_value = filter_params[0];
     var facets = filter_params[1];
     var result = [];
     for (var i = 0; i < activities.length; ++i) {
         var matches = true;
         var activity = activities[i];
-        console.log("Processing filters: ", filter_params);
+        //console.log("Processing filters: ", filter_params);
         for (var j = 0; j < facets.length; j++) {
             var facet = facets[j];
             var value = facet.extract(facet.key, activity);
@@ -438,85 +460,10 @@ function run_filter(activities) {
         if (matches)
             result.push(activity);
     }
+
     return result;
 }
-
-// activities is just the regular activities list
-// properies is an array of arrays of properties:
-// [['type'], ['gear_id']]
-function create_facet_ui(activities, properties_list) {
-    // count of propvals[proname][value] == count, like
-    // propval['type']['Ride'] == 12
-    var propvals = {};
-    for (var i = 0; i < properties_list.length; ++i) {
-        var properties = properties_list[i];
-
-        for (var k = 0; k < activities.length; ++k) {
-            var activity = activities[k];
-            var propkey = [];
-            var propval = [];
-            for (var j = 0; j < properties.length; j++) {
-                var property = properties[j];
-
-                var value = activity[property];
-                propkey.push(property);
-                propval.push(value);
-            }
-
-            propkey = propkey.join(',');
-            propval = propval.join(',');
-            if (!(propkey in propvals))
-                propvals[propkey] = {};
-            if (!(propval in propvals[propkey]))
-                propvals[propkey][propval] = 0;
-            ++propvals[propkey][propval];
-        }
-    }
-    console.log("Generated ", propvals);
-
-    var control_div = document.querySelector('.map-ui');
-    var labels = [];
-    for (i = 0; i < properties_list.length; ++i) {
-        properties = properties_list[i];
-        propkey = properties.join(',');
-        var container = document.createElement('div');
-        container.className = "map-control";
-        control_div.appendChild(container);
-
-        // technically this should be properties.join(','), but we're
-        // only using the first value because the label is probably
-        // prettier.
-        var label = properties[0] + ": ";
-        container.appendChild(document.createTextNode(label));
-        var tabStrip = document.createElement('polymer-ui-tabs');
-        tabStrip.properties = properties;
-        tabStrip.propkey = propkey;
-
-        function add(propval) {
-            var span = document.createElement('span');
-            var text = propval;
-            if (propval == '*')
-                text += " (" + sum(Object.keys(propvals[propkey])
-                                   .map(function(k) { return propvals[propkey][k]; }))
-                + ")";
-            else
-                text += " (" + propvals[propkey][propval] + ")";
-            span.innerText = text;
-            span.propval = propval;
-            tabStrip.appendChild(span);
-        }
-
-        add('*');
-        // just use the first property for now?
-        for (var propval in propvals[propkey]) {
-            add(propval);
-        }
-
-        container.appendChild(tabStrip);
-    }
-
-}
-
+*/
 function sum(values) {
     return values.reduceRight(function(previous, current) { return previous+current; });
 }
@@ -563,7 +510,7 @@ function xhrContext(progress) {
                     update_progress();
                     reject(e);
                 };
-                console.log("Requesting ", url);
+                //console.log("Requesting ", url);
                 xhr.send();
             } catch (ex) {
                 total_complete +=1;
@@ -621,10 +568,14 @@ function extract_day_of_week(key, obj) {
 }
 
 function display_city(values, count) {
+    if (count === undefined)
+        return values[0];
     return values[0] + " (" + count + ")";
 }
 
 function display_value(value, count) {
+    if (count === undefined)
+        return value;
     return value + " (" + count + ")";
 }
 
@@ -666,12 +617,32 @@ function update_progress_indicator(waiting, complete) {
 
 function init() {
     console.log("init()!");
-    document.querySelector('#main').responsiveWidth = "1000px";
+    var profilePage = document.querySelector('#main');
+    var context = init3d(profilePage);
+
+    var refreshAjax = profilePage.$['refresh-data'];
+    var refreshButton = profilePage.$['refresh-button'];
+    refreshAjax.addEventListener('core-complete', function() {
+        refreshButton.icon = 'refresh';
+        console.log("refresh Complete. Response: ", refreshAjax.response);
+        refresh(context);
+    });
+    profilePage.$['refresh-button'].addEventListener("click", function(e) {
+        if (refreshAjax.loading) return;
+        refreshButton.icon = 'radio-button-off';
+        refreshAjax.go();
+        console.log("Loading..");
+    });
+    console.log("Event handlers hooked up");
+
     XHR = xhrContext(update_progress_indicator);
 
     D = new Dataset();
-    D.activities().then(function(activities) {
+    D.raw_activities().then(function(activities) {
+        console.log("Have activities from dataset: ", activities, " facets: ", FACETS);
         FACETS.forEach(function(facet) {
+            console.log("Facet: ", facet);
+
             var key_counts = {};
             var key_string = JSON.stringify(facet.key);
             // extract all possible key values
@@ -683,37 +654,39 @@ function init() {
                 key_counts[key] += 1;
             });
 
-            console.log("Extracted: ", Object.keys(key_counts));
+            var facetInfo = {
+                facet: {
+                    id: facet.id,
+                    name: facet.name,
+                },
+                values: []
+            };
+            console.log("    Extracted: ", Object.keys(key_counts));
 
             // now build up the facet UI
             // (Note this will get way more complex in a bit)
             Object.keys(key_counts).forEach(function(key) {
                 var count = key_counts[key];
-                var sp = $('<span>')
-                        .addClass('tab')
-                        .attr('value', key)
-                        .attr('facet', facet.id)
-                        .text(facet.display(JSON.parse(key), count));
-                $('.facet-' + facet.id).append(sp);
+                facetInfo.values.push({
+                    name: facet.display(JSON.parse(key)),
+                    count: count,
+                    value: JSON.parse(key),
+                    id: facet.id,
+                });
             });
+            console.log("    Appending facet: ", facetInfo, " to ", profilePage.$.facet_list);
+            profilePage.$.facet_list.facets.push(facetInfo);
         });
         // extract all visible keys
     });
+    profilePage.$.facet_list.addEventListener(
+        'facet-value',
+        function() {
+            refresh(context);
+        });
 
-    var context = init3d();
     refresh(context);
     C = context;
-
-    var controls = document.querySelectorAll('.map-control polymer-ui-tabs');
-    for (var i = 0; i < controls.length; ++i) {
-        if (!controls[i].hasEventListener) {
-            controls[i].addEventListener('polymer-activate', function() {
-                refresh(context);
-            });
-            controls[i].hasEventListener = true;
-        }
-    }
-
 }
 
 if (document.body.hasAttribute('unresolved')) {

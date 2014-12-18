@@ -2,14 +2,13 @@
   "name": "strava-raceways",
   "version": "0.0.0",
   "dependencies": {
-    "platform": "Polymer/platform#master",
-    "polymer": "Polymer/polymer#master",
-    "polymer-ui-elements": "~0.2.1",
+    "polymer": "Polymer/polymer#~0.5.1",
     "jquery": "~2.1.1",
     "d3": "~3.4.11",
     "colorbrewer": "~1.0.0",
     "three.js-controls": "~0.0.67",
-    "core-elements": "Polymer/core-elements#~0.4.0",
-    "threejs": "*"
+    "threejs": "*",
+    "core-elements": "Polymer/core-elements#~0.5.1",
+    "paper-elements": "Polymer/paper-elements#~0.5.1"
   }
 }

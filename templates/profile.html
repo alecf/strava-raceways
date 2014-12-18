@@ -2,61 +2,16 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <script src="bower_components/platform/platform.js"></script>
+    <script src="bower_components/webcomponentsjs/webcomponents.min.js"></script>
     
-    <link rel="import" href="bower_components/polymer/polymer.html">
-    <link rel="import" href="bower_components/core-drawer-panel/core-drawer-panel.html">
-    <link rel="import" href="bower_components/core-header-panel/core-header-panel.html">
-    <link rel="import" href="bower_components/core-icon-button/core-icon-button.html">
-    <link rel="import" href="bower_components/core-item/core-item.html">
-    <link rel="import" href="bower_components/core-menu/core-menu.html">
-    <link rel="import" href="bower_components/core-scaffold/core-scaffold.html">
-    <link rel="import" href="bower_components/polymer-ui-tabs/polymer-ui-tabs.html">
-    <link rel="import" href="bower_components/polymer-ui-icon-button/polymer-ui-icon-button.html">
-        <link rel="stylesheet" href="styles/main.css">
-        <!-- <meta name="description" content=""> -->
-        <!-- <meta name="viewport" content="width=device-width, initial-scale=1"> -->
+    <link rel="import" href="/components/profile-page/profile-page.html">
+    <link rel="stylesheet" href="styles/main.css">
 </head>
 
 <body unresolved>
-    <core-scaffold id="main" responsiveWidth="1000px">
-        <core-header-panel navigation flex>
-            <div id="progress"></div>
-            <div>Navigation here!</div>
-            <div class="map-controls">
-                <div class="map-control map-type" properties='["type"]'>
-                    Type:
-                    <polymer-ui-tabs class="facet-type" valueattr="value" selected="*">
-                        <span class="tab" value="*">All</span>
-                    </polymer-ui-tabs>
-                </div>
-                <div class="map-control map-location" properties='["location_city","location_state","location_country"]'>
-                    Location:
-                    <polymer-ui-tabs valueattr="value" selected="*" class="facet-location">
-                        <span class="tab" value="*">All</span>
-                    </polymer-ui-tabs>
-                </div>
-                <div class="map-control map-location" properties='["start_date"]'>Day of Week:
-                    <polymer-ui-tabs valueattr="value" selected="*" class="facet-day_of_week">
-                        <span class="tab" value="*">All</span>
-                    </polymer-ui-tabs>
-                </div>
-            </div>
-        </core-header-panel>
-        
-        <span tool flex>Strava Raceways</span>
-        <polymer-ui-icon-button tool icon="refresh" id="refresh-button">
-        </polymer-ui-icon-button>
-
-        
-        <div class="content" layout horizontal>
-            <div flex layout vertical>
-                <canvas id="map-3d" width="800" height="400" flex></canvas>
-            </div>
-        </div>
-    </core-scaffold>
+  <profile-page id="main"></profile-page>
     <script type="text/javascript" defer async>
-        var athlete = {{json.dumps(athlete, indent=4, sort_keys=True)|safe}}
+     var athlete = {{json.dumps(athlete, indent=4, sort_keys=True)|safe}}
     </script>
     <script src="/scripts/eventloop.js" async></script>
     <script src="/scripts/profile.js" async></script>
@@ -64,49 +19,49 @@
     <script src="/bower_components/colorbrewer/colorbrewer.js" async></script>
     <script src="/bower_components/threejs/build/three.min.js" defer></script>
     <script src="/bower_components/three.js-controls/src/OrbitControls.js" defer></script>
-    <script src="bower_components/jquery/dist/jquery.min.js"></script>
+    <script src="/bower_components/jquery/dist/jquery.min.js"></script>
 
     <script id="vertexShader" type="x-shader/x-vertex">
-        // create a shared variable for the
-        // VS and FS containing the normal
-        varying vec3 vNormal;
+     // create a shared variable for the
+     // VS and FS containing the normal
+     varying vec3 vNormal;
 
-        void main() {
+     void main() {
 
-        // set the vNormal value with
-        // the attribute value passed
-        // in by Three.js
-        vNormal = normal;
+       // set the vNormal value with
+       // the attribute value passed
+       // in by Three.js
+       vNormal = normal;
 
-        gl_Position = projectionMatrix *
-        modelViewMatrix *
-        vec4(position, 1.0);
-        }
+       gl_Position = projectionMatrix *
+       modelViewMatrix *
+       vec4(position, 1.0);
+     }
     </script>
     <script id="fragmentShader" type="x-shader/x-fragment">
-        // same name and type as VS
-        varying vec3 vNormal;
+     // same name and type as VS
+     varying vec3 vNormal;
 
-        void main() {
+     void main() {
 
-        // calc the dot product and clamp
-        // 0 -> 1 rather than -1 -> 1
-        vec3 light = vec3(0.5, 0.2, 1.0);
+       // calc the dot product and clamp
+       // 0 -> 1 rather than -1 -> 1
+       vec3 light = vec3(0.5, 0.2, 1.0);
 
-        // ensure it's normalized
-        light = normalize(light);
+       // ensure it's normalized
+       light = normalize(light);
 
-        // calculate the dot product of
-        // the light to the vertex normal
-        float dProd = max(0.0,
-        dot(vNormal, light));
+       // calculate the dot product of
+       // the light to the vertex normal
+       float dProd = max(0.0,
+                         dot(vNormal, light));
 
-        // feed into our frag colour
-        gl_FragColor = vec4(dProd, // R
-        dProd, // G
-        dProd, // B
-        1.0);  // A
+       // feed into our frag colour
+       gl_FragColor = vec4(dProd, // R
+                           dProd, // G
+                           dProd, // B
+                           1.0);  // A
 
-        }
+     }
     </script>
 </body>
