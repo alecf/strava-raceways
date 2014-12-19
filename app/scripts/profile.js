@@ -657,11 +657,9 @@ function extract_possible_facet_values(activities) {
             key_counts[keyString] += 1;
         });
 
+        // This wrapps the current facet, and all of the possible values
         var facetInfo = {
-            facet: {
-                id: facet.id,
-                name: facet.name,
-            },
+            facet: facet,
             values: []
         };
         console.log("    Extracted counts: ", Object.keys(key_counts));
