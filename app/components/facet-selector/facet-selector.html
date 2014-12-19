@@ -4,8 +4,13 @@
 <link rel="import" href="../../bower_components/paper-checkbox/paper-checkbox.html">
 
 <polymer-element name="facet-selector">
+  <style>
+   ::shadow .label {
+     font-weight: bold;
+   }
+  </style>
   <template>
-    <h2>{{facet.name}}</h2>
+    <div class="label">{{facet.name}}</div>
     <core-menu id="list" on-core-select="{{valueSelected}}">
       <template repeat="{{value in values}}">
         <core-item>
