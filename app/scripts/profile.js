@@ -425,7 +425,7 @@ function run_filter(activities) {
             var facet_value = filter[1];
 
             var facet = FACETS_BY_ID[facet_id];
-            var activity_value = facet.extract(facet.key, activity);
+            var activity_value = facet.extract(facet.keyPath, activity);
             if (!facet.matches(facet_value, activity_value)) {
                 matches = false;
                 break;
@@ -451,7 +451,7 @@ function run_filter(activities) {
         //console.log("Processing filters: ", filter_params);
         for (var j = 0; j < facets.length; j++) {
             var facet = facets[j];
-            var value = facet.extract(facet.key, activity);
+            var value = facet.extract(facet.keyPath, activity);
             if (!facet.matches(match_value[j], value)) {
                 matches = false;
                 break;
@@ -530,9 +530,9 @@ function refresh(render_context) {
 
 // given a keylist like ['foo', 'bar'] extracts the corresponding
 // objects from obj, i.e. returns [obj.foo, obj.bar]
-function extract_key_list_value(key_list, obj) {
+function extract_key_list_value(keyPath, obj) {
     var key_value = [];
-    key_list.forEach(function(subkey) {
+    keyPath.forEach(function(subkey) {
         key_value.push(obj[subkey]);
     });
     return key_value;
@@ -556,7 +556,6 @@ function equals_lists(a, b) {
 }
 
 function equals_day_of_week(a, b) {
-    console.log("Comparing ", a, " and ", b, ": ", a == b);
     return a == b;
 }
 
@@ -579,24 +578,31 @@ function display_value(value, count) {
     return value + " (" + count + ")";
 }
 
+// FACETS defines the UI
+// name: The name in the UI
+// id: A unique id for use in the DOM or in dictionaries
+// keyPath: The path to extract a key, used by the extraction methods
+// extract: A function that can extract keys, passed the keyPath.
+// matches: Used to check if the result to 'extract' matches the given value.
+// display: Returns a display name for the UI, including a count.
 var FACETS = [
     { name: 'Location',
       id: 'location',
-      key: ['location_city', 'location_state', 'location_country'],
+      keyPath: ['location_city', 'location_state', 'location_country'],
       extract: extract_key_list_value,
       matches: equals_lists,
       display: display_city,
     },
     { name: 'Type',
       id: 'type',
-      key: 'type',
+      keyPath: 'type',
       extract: extract_key_value,
       matches: equals,
       display: display_value,
     },
     { name: 'Day of Week',
       id: 'day_of_week',
-      key: 'start_date',
+      keyPath: 'start_date',
       extract: extract_day_of_week,
       matches: equals_day_of_week,
       display: display_value,
@@ -640,44 +646,13 @@ function init() {
     D = new Dataset();
     D.raw_activities().then(function(activities) {
         console.log("Have activities from dataset: ", activities, " facets: ", FACETS);
-        FACETS.forEach(function(facet) {
-            console.log("Facet: ", facet);
 
-            var key_counts = {};
-            var key_string = JSON.stringify(facet.key);
-            // extract all possible key values
-            activities.forEach(function(activity) {
-                var key_value = facet.extract(facet.key, activity);
-                var key = JSON.stringify(key_value);
-                if (!(key in key_counts))
-                    key_counts[key] = 0;
-                key_counts[key] += 1;
-            });
+        var facetValues = extract_possible_facet_values(activities);
 
-            var facetInfo = {
-                facet: {
-                    id: facet.id,
-                    name: facet.name,
-                },
-                values: []
-            };
-            console.log("    Extracted: ", Object.keys(key_counts));
-
-            // now build up the facet UI
-            // (Note this will get way more complex in a bit)
-            Object.keys(key_counts).forEach(function(key) {
-                var count = key_counts[key];
-                facetInfo.values.push({
-                    name: facet.display(JSON.parse(key)),
-                    count: count,
-                    value: JSON.parse(key),
-                    id: facet.id,
-                });
-            });
-            console.log("    Appending facet: ", facetInfo, " to ", profilePage.$.facet_list);
-            profilePage.$.facet_list.facets.push(facetInfo);
-        });
-        // extract all visible keys
+        console.log("Extracted facet values: ", facetValues);
+        profilePage.$.facet_list.facets = facetValues;
+    }).catch(function(e) {
+        console.error("oops: ", e);
     });
     profilePage.$.facet_list.addEventListener(
         'facet-value',
@@ -687,6 +662,47 @@ function init() {
 
     refresh(context);
     C = context;
+}
+
+function extract_possible_facet_values(activities) {
+    var facetInfos = [];
+    FACETS.forEach(function(facet) {
+        console.log("Facet: ", facet);
+
+        var key_counts = {};
+        var key_string = JSON.stringify(facet.keyPath);
+        // extract all possible key values
+        activities.forEach(function(activity) {
+            var key_value = facet.extract(facet.keyPath, activity);
+            var keyString = JSON.stringify(key_value);
+            if (!(keyString in key_counts))
+                key_counts[keyString] = 0;
+            key_counts[keyString] += 1;
+        });
+
+        var facetInfo = {
+            facet: {
+                id: facet.id,
+                name: facet.name,
+            },
+            values: []
+        };
+        console.log("    Extracted counts: ", Object.keys(key_counts));
+
+        // now build up the facet UI
+        // (Note this will get way more complex in a bit)
+        Object.keys(key_counts).forEach(function(key) {
+            var count = key_counts[key];
+            facetInfo.values.push({
+                name: facet.display(JSON.parse(key)),
+                count: count,
+                value: JSON.parse(key),
+                id: facet.id,
+            });
+        });
+        facetInfos.push(facetInfo);
+    });
+    return facetInfos;
 }
 
 if (document.body.hasAttribute('unresolved')) {

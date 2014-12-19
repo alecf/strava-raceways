@@ -20,20 +20,10 @@
        facet: {
          name: '',
          id: '',
+         // etc - see FACETS in profile.js
        },
        values: [],
      },
-     filters: function() {
-       var results = [];
-       var valueItems = this.shadowRoot.querySelectorAll('core-item');
-       for (var i=0; i < valueItems.length; i++) {
-         console.log("Checking ", valueItems[i]);
-         var dataItem = valueItems[i].templateInstance.model.value
-       }
-       
-       return results;
-     },
-
      filterValues: function() {
        var results = [];
        var coreItems = this.shadowRoot.querySelectorAll('core-item');
