@@ -38,7 +38,7 @@
          var dataItem = coreItem.templateInstance.model.value;
          // surely there's a better way to test selection?
          if (coreItem.classList.contains('core-selected')) {
-           results.push([dataItem.id, dataItem.value]);
+           results.push([this.facet, dataItem.value]);
          }
        }
 

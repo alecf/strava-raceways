@@ -396,7 +396,6 @@ function make_filters() {
 
     // generate filter
     var profilePage = document.querySelector('#main');
-    var controls = profilePage.$.map_controls;
     var facet_list = profilePage.$.facet_list;
     console.log("List is here: ", facet_list, " with selectors: ", facet_list.selectors().length);
     FL = facet_list;
@@ -418,10 +417,9 @@ function run_filters(activities) {
         var matches = true;
         for (var j = 0; j < filters.length; j++) {
             var filter = filters[j];
-            var facet_id = filter[0];
+            var facet = filter[0];
             var facet_value = filter[1];
 
-            var facet = FACETS_BY_ID[facet_id];
             var activity_value = facet.extract(facet.keyPath, activity);
             if (!facet.matches(facet_value, activity_value)) {
                 matches = false;
@@ -672,7 +670,6 @@ function extract_possible_facet_values(activities) {
                 name: facet.display(JSON.parse(key)),
                 count: count,
                 value: JSON.parse(key),
-                id: facet.id,
             });
         });
         facetInfos.push(facetInfo);
