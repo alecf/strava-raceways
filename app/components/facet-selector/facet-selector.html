@@ -1,14 +1,15 @@
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../bower_components/core-menu/core-menu.html">
 <link rel="import" href="../../bower_components/core-item/core-item.html">
+<link rel="import" href="../../bower_components/paper-checkbox/paper-checkbox.html">
 
 <polymer-element name="facet-selector">
   <template>
-    <h2>{{facet.name}} ({{values.length}})</h2>
+    <h2>{{facet.name}}</h2>
     <core-menu id="list" on-core-select="{{valueSelected}}">
       <template repeat="{{value in values}}">
         <core-item>
-          {{value.name}} ({{value.count}})
+          <div>{{value.name}} ({{value.count}})</div>
         </core-item>
       </template>
     </core-menu>
@@ -29,7 +30,6 @@
        var coreItems = this.shadowRoot.querySelectorAll('core-item');
        for (var i=0; i < coreItems.length; i++) {
          var coreItem = coreItems[i];
-         console.log("Checking ", coreItem);
          var dataItem = coreItem.templateInstance.model.value;
          // surely there's a better way to test selection?
          if (coreItem.classList.contains('core-selected')) {

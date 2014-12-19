@@ -7,16 +7,20 @@
 <link rel="import" href="../../bower_components/core-menu/core-menu.html">
 <link rel="import" href="../../bower_components/core-scaffold/core-scaffold.html">
 <link rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
-<link rel="import" href="../../bower_components/paper-tabs/paper-tabs.html">
-<link rel="import" href="../facet-selector/facet-selector.html">
+<link rel="import" href="../../bower_components/paper-progress/paper-progress.html">
 <link rel="import" href="../facet-list/facet-list.html">
+<link rel="import" href="../facet-selector/facet-selector.html">
 
 <polymer-element name="profile-page">
+  <style>
+   #progress {
+     width: 100%;
+   }
+  </style>
   <template>
     <core-scaffold responsiveWidth="1000px">
       <core-header-panel navigation fit layout vertical>
-        <div id="progress"></div>
-        <div>Navigation here!</div>
+        <paper-progress id="progress"></paper-progress>
         <facet-list id="facet_list" on-facet-value="{{facetSelected}}">
         </facet-list>
       </core-header-panel>

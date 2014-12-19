@@ -227,7 +227,7 @@ Dataset.prototype.raw_activities = function() {
 
 Dataset.prototype.activities = function() {
     return this._pending_activities.then(function(activities) {
-        var r = run_filter(activities);
+        var r = run_filters(activities);
         //console.log("Filtered to ", r.length, " activities");
         return r;
     });
@@ -390,11 +390,10 @@ function updatescene(render_context, bounds, activities) {
 
 // creates a filter from the UI controls, where the filter is in the form
 // [[key, value], [key, value]]
+// the key, value will be passed to matches?
 function make_filters() {
     var results = [];
 
-
-    //return [test_value, test_facet];
     // generate filter
     var profilePage = document.querySelector('#main');
     var controls = profilePage.$.map_controls;
@@ -404,15 +403,13 @@ function make_filters() {
     var selectors = facet_list.selectors();
     for (var i = 0; i < selectors.length; i++) {
         var selector = selectors[i];
-        console.log("Looking at selector: ", selector);
-
         var filters = selector.filterValues();
         results = results.concat(filters);
     }
     return results;
 }
 
-function run_filter(activities) {
+function run_filters(activities) {
     var result = [];
     var filters = make_filters();
     console.log("Runnning filters against ", filters);
@@ -439,34 +436,6 @@ function run_filter(activities) {
     return result;
 }
 
-/*
-function run_filter(activities) {
-    var filter_params = make_filters()[0];
-    var match_value = filter_params[0];
-    var facets = filter_params[1];
-    var result = [];
-    for (var i = 0; i < activities.length; ++i) {
-        var matches = true;
-        var activity = activities[i];
-        //console.log("Processing filters: ", filter_params);
-        for (var j = 0; j < facets.length; j++) {
-            var facet = facets[j];
-            var value = facet.extract(facet.keyPath, activity);
-            if (!facet.matches(match_value[j], value)) {
-                matches = false;
-                break;
-            }
-        }
-        if (matches)
-            result.push(activity);
-    }
-
-    return result;
-}
-*/
-function sum(values) {
-    return values.reduceRight(function(previous, current) { return previous+current; });
-}
 
 // Create an XHR context that fires off progress notifications
 // usage:
@@ -539,7 +508,7 @@ function extract_key_list_value(keyPath, obj) {
 }
 
 function extract_key_value(key, obj) {
-    return obj[key];
+    return obj[key] || "(none)";
 }
 
 function equals(a, b) {
@@ -606,7 +575,14 @@ var FACETS = [
       extract: extract_day_of_week,
       matches: equals_day_of_week,
       display: display_value,
-    }
+    },
+    { name: 'Gear',
+      id: 'gear_id',
+      keyPath: 'gear_id',
+      extract: extract_key_value,
+      matches: equals,
+      display: display_value,
+    },
 ];
 
 var FACETS_BY_ID = {};
@@ -615,10 +591,11 @@ FACETS.forEach(function(facet) {
 });
 
 function update_progress_indicator(waiting, complete) {
-    if (waiting == complete)
-        $('#progress').hide();
-    else
-        $('#progress').show().text(Math.floor(complete*100/waiting) + "%");
+    var profilePage = document.querySelector('#main');
+    var progress = profilePage.$.progress;
+    progress.value = complete;
+    progress.max = waiting;
+    // TODO: Hide if complete == waiting?
 }
 
 function init() {
