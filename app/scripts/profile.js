@@ -227,9 +227,7 @@ Dataset.prototype.raw_activities = function() {
 
 Dataset.prototype.activities = function() {
     return this._pending_activities.then(function(activities) {
-        var r = run_filters(activities);
-        //console.log("Filtered to ", r.length, " activities");
-        return r;
+        return run_filters(activities);
     });
 };
 
@@ -399,13 +397,7 @@ function make_filters() {
     var facet_list = profilePage.$.facet_list;
     console.log("List is here: ", facet_list, " with selectors: ", facet_list.selectors().length);
     FL = facet_list;
-    var selectors = facet_list.selectors();
-    for (var i = 0; i < selectors.length; i++) {
-        var selector = selectors[i];
-        var filters = selector.filterValues();
-        results = results.concat(filters);
-    }
-    return results;
+    return facet_list.getFilterValues();
 }
 
 function run_filters(activities) {

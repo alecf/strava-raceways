@@ -16,6 +16,16 @@
      selectors: function() {
        return this.shadowRoot.querySelectorAll('facet-selector');
      },
+     getFilterValues: function() {
+       var results = [];
+       var selectors = this.selectors();
+       for (var i = 0; i < selectors.length; i++) {
+         var selector = selectors[i];
+         var filters = selector.filterValues();
+         results = results.concat(filters);
+       }
+       return results;
+     },
      onFacetValue: function(e) {
        console.log("onFacetValue(", e, ")");
      },
