@@ -9,6 +9,7 @@
     "three.js-controls": "~0.0.67",
     "threejs": "*",
     "core-elements": "Polymer/core-elements#~0.5",
-    "paper-elements": "Polymer/paper-elements#~0.5"
+    "paper-elements": "Polymer/paper-elements#~0.5",
+    "lodash": "~3.0.0"
   }
 }
