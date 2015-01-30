@@ -3,23 +3,18 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <script src="bower_components/webcomponentsjs/webcomponents.min.js"></script>
-    
+    <link rel="import" href="/bower_components/polymer/polymer.html">
     <link rel="import" href="/components/profile-page/profile-page.html">
     <link rel="stylesheet" href="styles/main.css">
 </head>
 
-<body unresolved>
+<body unresolved fullbleed>
   <profile-page id="main"></profile-page>
     <script type="text/javascript" defer async>
      var athlete = {{json.dumps(athlete, indent=4, sort_keys=True)|safe}}
     </script>
     <script src="/scripts/eventloop.js" async></script>
-    <script src="/scripts/profile.js" async></script>
-    <script src="/bower_components/d3/d3.min.js" async></script>
-    <script src="/bower_components/colorbrewer/colorbrewer.js" async></script>
-    <script src="/bower_components/threejs/build/three.min.js" defer></script>
-    <script src="/bower_components/three.js-controls/src/OrbitControls.js" defer></script>
-    <script src="/bower_components/jquery/dist/jquery.min.js"></script>
+<!--    <script src="/bower_components/jquery/dist/jquery.min.js"></script> -->
 
     <script id="vertexShader" type="x-shader/x-vertex">
      // create a shared variable for the

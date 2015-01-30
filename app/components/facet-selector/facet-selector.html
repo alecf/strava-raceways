@@ -1,6 +1,7 @@
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../bower_components/core-menu/core-menu.html">
 <link rel="import" href="../../bower_components/core-item/core-item.html">
+<link rel="import" href="../../bower_components/paper-item/paper-item.html">
 <link rel="import" href="../../bower_components/paper-checkbox/paper-checkbox.html">
 
 <polymer-element name="facet-selector">
@@ -14,7 +15,7 @@
     <core-menu id="list" on-core-select="{{valueSelected}}">
       <template repeat="{{value in values}}">
         <core-item>
-          <div>{{value.name}} ({{value.count}})</div>
+          <paper-item>{{value.name}} ({{value.count}})</paper-item>
         </core-item>
       </template>
     </core-menu>

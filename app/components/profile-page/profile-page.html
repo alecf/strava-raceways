@@ -11,10 +11,18 @@
 <link rel="import" href="../facet-list/facet-list.html">
 <link rel="import" href="../facet-selector/facet-selector.html">
 
+<script src="/bower_components/d3/d3.min.js" defer></script>
+<script src="/bower_components/colorbrewer/colorbrewer.js" defer></script>
+<script src="/scripts/profile.js" defer></script>
+<script src="/scripts/bounds.js" defer></script>
+
+<script src="/bower_components/threejs/build/three.min.js" defer></script>
+<script src="/bower_components/three.js-controls/src/OrbitControls.js" defer></script>
+
 <polymer-element name="profile-page">
   <link rel="stylesheet" href="profile-page.css">
   <template>
-    <core-scaffold responsiveWidth="1000px">
+    <core-scaffold responsiveWidth="1000px" layout vertical>
       <core-header-panel navigation fit layout vertical>
         <paper-progress id="progress"></paper-progress>
         <facet-list id="facet_list" on-facet-value="{{facetSelected}}">
@@ -31,20 +39,5 @@
     </core-scaffold>
     <core-ajax id="refresh-data" url="/api/update" handleAs="json"></core-ajax>
   </template>
-  <script>
-   Polymer({
-     'facetSelected': function(e) {
-       console.log("Filters should be updated with ", e.facet.id, " = ", e.value.value);
-     },
-     'ready': function() {
-       console.log("profile-page ready");
-
-       /* this.$.sample.facet.name = 'City';
-          this.$.sample.values.push({name: "Berkeley", count: 100});
-          this.addEventListener('core-select', function(e, detail, ex) {
-          console.log("Selected: ", this, ": ", e, detail, ex);
-          }); */
-     },
-   });
-  </script>
+  <script src="profile-page.js" defer></script>
 </polymer-element>
