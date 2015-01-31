@@ -54,8 +54,8 @@ Bounds.prototype.withGeoData = function(callback) {
         var zipped = _.zip(activity.stream.latlng.data,
                            activity.stream.altitude.data);
         return zipped.map(function(streamdata) {
-            streamdata.push(i);
-            return callback.apply(this, streamdata);
+            // streamdata is [latlng, altitude]
+            return callback.call(this, streamdata[0][0], streamdata[0][1], streamdata[1], i);
         });
     });
 };
@@ -69,9 +69,9 @@ Bounds.prototype.generate_proximity_streams = function(n) {
     var bucket_z = this.scale_z.copy().rangeRound([0, n]).clamp(true);
 
     var bucketCount = {};
-    function inc(lng,lat,alt,id) {
-        var x = bucket_x(lat);
-        var y = bucket_y(lng);
+    function inc(lat, lng,alt,id) {
+        var x = bucket_x(lng);
+        var y = bucket_y(lat);
         var z = bucket_z(alt);
         if (!(x in bucketCount))
             bucketCount[x] = {};
@@ -81,23 +81,20 @@ Bounds.prototype.generate_proximity_streams = function(n) {
             bucketCount[x][y][z] = d3.set();
         bucketCount[x][y][z].add(id);
     }
-    function val(lng, lat, alt) {
-        var x = bucket_x(lat);
-        var y = bucket_y(lng);
+    function val(lat, lng, alt) {
+        var x = bucket_x(lng);
+        var y = bucket_y(lat);
         var z = bucket_z(alt);
-        return bucketCount[x][y][z].values().length;
+        return bucketCount[x][y][z].size();
     }
     // this is kind of a map-reduce style index: count up all
     // lat/lng/altitude combos, then redistribute the counts out to
     // each stream.
-    this.withGeoData(function(latlng, altitude, index) {
-        inc(latlng[0], latlng[1], altitude, index);
-    });
+    this.withGeoData(inc);
 
-    var proximities = this.withGeoData(function(latlng, altitude, index) {
-        return val(latlng[0], latlng[1], altitude);
-    });
-    var maxProximity = _(proximities).flatten().max();
+    var proximities = this.withGeoData(val);
+
+    // now reintegrate them into the existing activities
     _.zip(this.activities_, proximities).forEach(function(actprox) {
         var activity = actprox[0];
         var proximity = actprox[1];
@@ -105,7 +102,7 @@ Bounds.prototype.generate_proximity_streams = function(n) {
     });
 
     // we keep a max so that the proximity shapes have a size range;
-    this.maxProximity_ = maxProximity;
+    this.maxProximity_ = _(proximities).flatten().max();
 
     // we're throwing bucketCount away at this point, but could there
     // be value in colorizing the space? i.e. visualizing a cloud in

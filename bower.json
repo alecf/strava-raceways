@@ -3,13 +3,13 @@
   "version": "0.0.0",
   "dependencies": {
     "polymer": "Polymer/polymer#~0.5",
-    "jquery": "~2.1.1",
-    "d3": "~3.4.11",
+    "jquery": "~2.1",
+    "d3": "~3.4",
     "colorbrewer": "~1.0.0",
-    "three.js-controls": "~0.0.67",
+    "three.js-controls": "*",
     "threejs": "*",
     "core-elements": "Polymer/core-elements#~0.5",
     "paper-elements": "Polymer/paper-elements#~0.5",
-    "lodash": "~3.0.0"
+    "lodash": "~3.0"
   }
 }
