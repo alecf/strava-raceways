@@ -1,5 +1,7 @@
 
-function Profile() {}
+function Profile() {
+
+}
 
 // Get a stream and attach it to the activity. Returns a promise that
 // resolves to a copy of the activity, and a 'stream' property with
@@ -246,47 +248,6 @@ function updatescene(render_context, bounds, activities) {
     //console.log("Kicking off render with ", render_context.scene, render_context.camera);
 }
 
-// creates a filter from the current state of the UI controls, where the filter is in the form
-// [[key, value], [key, value]]
-// the key, value will be passed to matches?
-function make_filters() {
-    var results = [];
-
-    // generate filter
-    var profilePage = document.querySelector('#main');
-    var facet_list = profilePage.$.facet_list;
-    console.log("List is here: ", facet_list, " with selectors: ", facet_list.selectors().length);
-    FL = facet_list;
-    return facet_list.getFilterValues();
-}
-
-function run_filters(activities) {
-    var result = [];
-    var filters = make_filters();
-    console.log("Runnning filters against ", filters);
-    for (var i = 0; i < activities.length; i++) {
-        var activity = activities[i];
-        var matches = true;
-        for (var j = 0; j < filters.length; j++) {
-            var filter = filters[j];
-            var facet = filter[0];
-            var facet_value = filter[1];
-
-            var activity_value = facet.extract(facet.keyPath, activity);
-            if (!facet.matches(facet_value, activity_value)) {
-                matches = false;
-                break;
-            }
-        }
-
-        if (matches) {
-            result.push(activity);
-        }
-    }
-    return result;
-}
-
-
 // Create an XHR context that fires off progress notifications
 // usage:
 // function update_progress(waiting, total) {
@@ -338,13 +299,6 @@ function xhrContext(progress) {
             };
         });
     };
-}
-
-function refresh(render_context) {
-    console.log("refreshing..");
-    return D.activities().then(function(activities) {
-        updatemap(render_context, activities);
-    }).catch(function(ex) { console.error(ex); });
 }
 
 // given a keylist like ['foo', 'bar'] extracts the corresponding
@@ -448,18 +402,16 @@ function update_progress_indicator(waiting, complete) {
     // TODO: Hide if complete == waiting?
 }
 
-Profile.init = function() {
-    console.log("init()!");
-    var profilePage = document.querySelector('#main');
-    var context = init3d(profilePage);
+Profile.prototype.init = function(profilePage) {
+    this.context = init3d(profilePage);
 
     var refreshAjax = profilePage.$['refresh-data'];
     var refreshButton = profilePage.$['refresh-button'];
     refreshAjax.addEventListener('core-complete', function() {
         refreshButton.icon = 'refresh';
         console.log("refresh Complete. Response: ", refreshAjax.response);
-        refresh(context);
-    });
+        this.refresh();
+    }.bind(this));
     profilePage.$['refresh-button'].addEventListener("click", function(e) {
         if (refreshAjax.loading) return;
         refreshButton.icon = 'radio-button-off';
@@ -470,8 +422,9 @@ Profile.init = function() {
 
     XHR = xhrContext(update_progress_indicator);
 
-    D = new Dataset();
-    D.raw_activities().then(function(activities) {
+    this.dataset = new Dataset(profilePage.$.facet_list);
+
+    this.dataset.raw_activities().then(function(activities) {
         console.log("Have activities from dataset: ", activities.length, " facets: ", FACETS);
 
         var facetValues = extract_possible_facet_values(activities);
@@ -481,15 +434,17 @@ Profile.init = function() {
     }).catch(function(e) {
         console.error("oops: ", e);
     });
-    profilePage.$.facet_list.addEventListener(
-        'facet-value',
-        function() {
-            refresh(context);
-        });
+    profilePage.$.facet_list.addEventListener('facet-value', this.refresh.bind(this));
+    this.refresh();
+};
 
-    refresh(context);
-    C = context;
-}
+Profile.prototype.refresh = function() {
+    return this.dataset.activities()
+        .then(function(activities) {
+            updatemap(this.context, activities);
+        }.bind(this))
+        .catch(function(ex) { console.error(ex); });
+};
 
 function extract_possible_facet_values(activities) {
     var facetInfos = [];

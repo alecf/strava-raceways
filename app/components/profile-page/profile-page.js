@@ -5,7 +5,8 @@ Polymer('profile-page', {
     ready: function() {
         console.log("profile-page ready");
 
-        Profile.init();
+        this.profile = new Profile();
+        this.profile.init(this);
     },
     onRefresh: function() {
 
