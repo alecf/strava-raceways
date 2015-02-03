@@ -80,6 +80,10 @@ Bounds.prototype.consume_index = function(stream_index) {
     this.generate_proximity_streams(20);
 };
 
+Bounds.prototype.activities = function() {
+    return this.activities_;
+};
+
 Bounds.prototype.withGeoData = function(callback) {
     return this.activities_.map(function(activity, i) {
         var zipped = _.zip(activity.stream.latlng.data,

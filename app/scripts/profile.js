@@ -130,7 +130,8 @@ Profile.prototype.init = function() {
 Profile.prototype.refresh = function() {
     return this.dataset.activities()
         .then(function(activities) {
-            this.context.updatemap(activities);
+            this.bounds = new Bounds(activities);
+            this.context.updatemap(this.bounds);
         }.bind(this))
         .catch(function(ex) { console.error(ex); });
 };

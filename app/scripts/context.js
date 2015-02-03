@@ -14,6 +14,7 @@ function RenderContext(canvas) {
     this.canvas = canvas;
     this.height = 300;
     this.width = 400;
+    this.materials_ = {};
 }
 
 
@@ -33,18 +34,14 @@ RenderContext.prototype.render_loop = function() {
 /**
  * Update the map
  */
-RenderContext.prototype.updatemap = function(activities) {
-    var bounds = new Bounds(activities);
-    B = bounds;
-
+RenderContext.prototype.updatemap = function(bounds) {
     bounds.ready().then(function() {
-        this.updatescene(bounds, activities);
+        this.updatescene(bounds, bounds.activities());
         this.render_loop();
     }.bind(this)).catch(function(ex) { console.error(ex); });
 };
 
-RenderContext.prototype.updatescene = function(bounds, activities) {
-
+RenderContext.prototype.ensureCamera = function() {
     if (!this.camera) {
         this.camera =
             new THREE.PerspectiveCamera( 75,
@@ -63,22 +60,29 @@ RenderContext.prototype.updatescene = function(bounds, activities) {
             this.render_loop();
         }.bind(this));
     }
-    bounds.setSize(this.canvas.width, this.canvas.height);
+};
+
+RenderContext.prototype.getMaterial = function(color) {
+    if (!(color in this.materials_)) {
+        this.materials_[color] = new THREE.MeshLambertMaterial( {
+            color: color,
+            shading: THREE.FlatShading
+        } );
+    }
+    return this.materials_[color];
+};
+
+RenderContext.prototype.add_activities_to_scene = function(bounds, activities) {
+    var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
+
     var proximityRadius = d3.scale.linear().domain([1, bounds.maxProximity_]);
     proximityRadius.rangeRound([0, 4]);
 
-    var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
-
-    var max_z = -1;
-    var min_z = -1;
     var totalspheres = 0;
-    this.scene = new THREE.Scene();
+    var materials = {};
+
     activities.forEach(function(activity, index) {
-        var lambertMaterial =
-                new THREE.MeshLambertMaterial( {
-                    color: color(index),
-                    shading: THREE.FlatShading
-                } );
+        var lambertMaterial = this.getMaterial(color(index));
 
         //console.log("drawing activity ", index, ": ", activity);
         var geometry = new THREE.Geometry();
@@ -121,6 +125,40 @@ RenderContext.prototype.updatescene = function(bounds, activities) {
         this.scene.add(line);
     }, this);
 
+};
+
+RenderContext.prototype.add_backing_plane = function() {
+    var lambertMaterial =
+            new THREE.MeshLambertMaterial( { color: 0xdddddd, shading: THREE.FlatShading } );
+    // backing plane for visual reference
+    var planeSize = Math.min(this.width, this.height);
+    // use planeSize when we correctly scale height/width
+    var planeGeometry = new THREE.PlaneGeometry( this.width, this.height);
+    var planeMaterial = new THREE.MeshBasicMaterial( {color: 0xaaaaaa, side: THREE.DoubleSide} );
+    var plane = new THREE.Mesh( planeGeometry, lambertMaterial );
+    plane.position.x = this.width / 2;
+    plane.position.y = this.height / 2;
+    plane.position.z = 0;
+    this.scene.add(plane);
+};
+
+RenderContext.prototype.add_light = function() {
+    var pointLight = new THREE.PointLight(0xffffff, 1);
+    pointLight.position.set(this.width, this.height, 300);
+	this.scene.add( new THREE.AmbientLight( 0x111111 ) );
+    this.scene.add( pointLight );
+};
+
+RenderContext.prototype.updatescene = function(bounds, activities) {
+
+    this.ensureCamera();
+    bounds.setSize(this.canvas.width, this.canvas.height);
+
+    var max_z = -1;
+    var min_z = -1;
+    this.scene = new THREE.Scene();
+    this.add_activities_to_scene(bounds, activities);
+
     //console.log("Total of ", totalspheres, " spheres");
     var min = {};
     var max = {};
@@ -147,27 +185,12 @@ RenderContext.prototype.updatescene = function(bounds, activities) {
                 vertexShader:   vShader,
                 fragmentShader: fShader
             });
-    var lambertMaterial =
-            new THREE.MeshLambertMaterial( { color: 0xdddddd, shading: THREE.FlatShading } );
 
-    // backing plane for visual reference
-    var planeSize = Math.min(this.width, this.height);
-    // use planeSize when we correctly scale height/width
-    var planeGeometry = new THREE.PlaneGeometry( this.width, this.height);
-    var planeMaterial = new THREE.MeshBasicMaterial( {color: 0xaaaaaa, side: THREE.DoubleSide} );
-    var plane = new THREE.Mesh( planeGeometry, lambertMaterial );
-    plane.position.x = this.width / 2;
-    plane.position.y = this.height / 2;
-    plane.position.z = 0;
-    this.scene.add(plane);
+    this.add_backing_plane();
 
-    var pointLight = new THREE.PointLight(0xffffff, 1);
-    pointLight.position.set(this.width, this.height, 300);
-	this.scene.add( new THREE.AmbientLight( 0x111111 ) );
-    this.scene.add( pointLight );
+    this.add_light();
 
 
-    REFPLANE = plane;
     console.log("Setting camera at ", center.x, max.y*1.5, max.z);
     this.camera.position.set(center.x, max.y*1.5, max.z);
     this.controls.target.set(center.x, center.y, center.z);

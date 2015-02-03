@@ -41,7 +41,7 @@
         <canvas id="canvas3d" width="800" height="400" flex></canvas>
       </div>
     </core-scaffold>
-    <core-ajax id="refresh-data" url="/api/update"
+    <core-ajax id="refresh-data" url="/api/update?count=30"
                handleAs="json" on-core-complete="{{onDataLoaded}}">
     </core-ajax>
   </template>
