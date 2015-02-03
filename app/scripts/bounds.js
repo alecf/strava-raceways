@@ -28,7 +28,8 @@ Bounds.prototype.load_stream = function(activity) {
             activity.stream = stream;
             return activity;
         });
-}
+};
+
 
 // Returns a promise that resolves the an array of all activities
 Bounds.prototype.load_streams = function(activities) {
@@ -41,12 +42,12 @@ Bounds.prototype.load_streams = function(activities) {
             console.log("Streams loaded ");
             return e;
         });
-}
+};
 
 
 Bounds.prototype.ready = function() {
     return this.ready_;
-}
+};
 
 // xxx need a better name
 Bounds.prototype.consume_index = function(stream_index) {

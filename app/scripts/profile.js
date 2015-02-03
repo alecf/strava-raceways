@@ -6,7 +6,7 @@
 // }
 // var XHR = xhrContext(update_progress);
 // XHR('http://....).then(function(result)) {... });
-function xhrContext(progress) {
+function XHRContext(progress) {
     var total_started = 0;
     var total_complete = 0;
 
@@ -145,8 +145,8 @@ FACETS.forEach(function(facet) {
     FACETS_BY_ID[facet.id] = facet;
 });
 
-function Profile() {
-
+function Profile(profilePage) {
+    this.profilePage = profilePage;
 }
 
 
@@ -155,20 +155,19 @@ Profile.prototype.update_progress_indicator = function(waiting, complete) {
     progress.value = complete;
     progress.max = waiting;
     // TODO: Hide if complete == waiting?
-}
+};
 
-Profile.prototype.init = function(profilePage) {
-    this.profilePage = profilePage;
-    this.context = init3d(profilePage.$.canvas3d);
+Profile.prototype.init = function() {
+    this.context = init3d(this.profilePage.$.canvas3d);
 
-    var refreshAjax = profilePage.$['refresh-data'];
-    var refreshButton = profilePage.$['refresh-button'];
+    var refreshAjax = this.profilePage.$['refresh-data'];
+    var refreshButton = this.profilePage.$['refresh-button'];
     refreshAjax.addEventListener('core-complete', function() {
         refreshButton.icon = 'refresh';
         console.log("refresh Complete. Response: ", refreshAjax.response);
         this.refresh();
     }.bind(this));
-    profilePage.$['refresh-button'].addEventListener("click", function(e) {
+    this.profilePage.$['refresh-button'].addEventListener("click", function(e) {
         if (refreshAjax.loading) return;
         refreshButton.icon = 'radio-button-off';
         refreshAjax.go();
@@ -176,9 +175,9 @@ Profile.prototype.init = function(profilePage) {
     });
     console.log("Event handlers hooked up");
 
-    XHR = xhrContext(this.update_progress_indicator.bind(this));
+    XHR = XHRContext(this.update_progress_indicator.bind(this));
 
-    this.dataset = new Dataset(profilePage.$.facet_list);
+    this.dataset = new Dataset(this.profilePage.$.facet_list);
 
     this.dataset.raw_activities().then(function(activities) {
         console.log("Have activities from dataset: ", activities.length, " facets: ", FACETS);
@@ -186,11 +185,11 @@ Profile.prototype.init = function(profilePage) {
         var facetValues = extract_possible_facet_values(activities);
 
         console.log("Extracted facet values: ", facetValues);
-        profilePage.$.facet_list.facets = facetValues;
-    }).catch(function(e) {
+        this.profilePage.$.facet_list.facets = facetValues;
+    }.bind(this)).catch(function(e) {
         console.error("oops: ", e);
     });
-    profilePage.$.facet_list.addEventListener('facet-value', this.refresh.bind(this));
+    // profilePage.$.facet_list.addEventListener('facet-value', this.refresh.bind(this));
     this.refresh();
 };
 
