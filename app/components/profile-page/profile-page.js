@@ -10,6 +10,14 @@ Polymer('profile-page', {
         this.profile.init();
     },
     onRefresh: function() {
-
-    }
+        if (this.$['refresh-data'].loading) return;
+        this.$['refresh-button'].icon = 'radio-button-off';
+        this.$['refresh-data'].go();
+        console.log("Loading..");
+    },
+    onDataLoaded: function() {
+        refreshButton.icon = 'refresh';
+        console.log("refresh Complete. Response: ", refreshAjax.response);
+        this.profilePage.refresh();
+    },
 });

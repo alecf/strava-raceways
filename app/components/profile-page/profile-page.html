@@ -40,7 +40,9 @@
         <canvas id="canvas3d" width="800" height="400" flex></canvas>
       </div>
     </core-scaffold>
-    <core-ajax id="refresh-data" url="/api/update" handleAs="json"></core-ajax>
+    <core-ajax id="refresh-data" url="/api/update"
+               handleAs="json" on-core-complete="{{onDataLoaded}}">
+    </core-ajax>
   </template>
   <script src="profile-page.js"></script>
 </polymer-element>

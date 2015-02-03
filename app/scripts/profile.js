@@ -161,18 +161,6 @@ Profile.prototype.init = function() {
     this.context = init3d(this.profilePage.$.canvas3d);
 
     var refreshAjax = this.profilePage.$['refresh-data'];
-    var refreshButton = this.profilePage.$['refresh-button'];
-    refreshAjax.addEventListener('core-complete', function() {
-        refreshButton.icon = 'refresh';
-        console.log("refresh Complete. Response: ", refreshAjax.response);
-        this.refresh();
-    }.bind(this));
-    this.profilePage.$['refresh-button'].addEventListener("click", function(e) {
-        if (refreshAjax.loading) return;
-        refreshButton.icon = 'radio-button-off';
-        refreshAjax.go();
-        console.log("Loading..");
-    });
     console.log("Event handlers hooked up");
 
     XHR = XHRContext(this.update_progress_indicator.bind(this));
@@ -189,7 +177,6 @@ Profile.prototype.init = function() {
     }.bind(this)).catch(function(e) {
         console.error("oops: ", e);
     });
-    // profilePage.$.facet_list.addEventListener('facet-value', this.refresh.bind(this));
     this.refresh();
 };
 
