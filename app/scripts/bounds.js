@@ -3,16 +3,46 @@
 
 // requires d3.js and lodash
 
-function Bounds(activities) {
+function Bounds(activities, xhrContext) {
+    this.xhr_ = xhrContext;
     this.activities_ = activities;
     this.ready_ =
-        load_streams(activities)
+        this.load_streams(activities)
         .then(index_streams)
         .then(this.consume_index.bind(this));
     this.ready_.catch(function(ex) {
         console.error("Error loading and indexing: ", ex);
     });
 }
+
+// Get a stream and attach it to the activity. Returns a promise that
+// resolves to a copy of the activity, and a 'stream' property with
+// stream data.
+Bounds.prototype.load_stream = function(activity) {
+    var activity_id = activity.activity_id;
+    if (activity.stream)
+        return Promise.resolve(activity);
+    return XHR('/api/streams?activity_id=' + activity_id)
+        .then(function(streams) {
+            var stream = streams.result.streams[activity_id];
+            activity.stream = stream;
+            return activity;
+        });
+}
+
+// Returns a promise that resolves the an array of all activities
+Bounds.prototype.load_streams = function(activities) {
+    var results = [];
+    for (var i = 0; i < activities.length; ++i) {
+        results.push(this.load_stream(activities[i]));
+    }
+    return Promise.all(results)
+        .then(function(e) {
+            console.log("Streams loaded ");
+            return e;
+        });
+}
+
 
 Bounds.prototype.ready = function() {
     return this.ready_;

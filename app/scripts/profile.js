@@ -3,30 +3,6 @@ function Profile() {
 
 }
 
-// Get a stream and attach it to the activity. Returns a promise that
-// resolves to a copy of the activity, and a 'stream' property with
-// stream data.
-function load_stream(activity) {
-    var activity_id = activity.activity_id;
-    if (activity.stream)
-        return Promise.resolve(activity);
-    return XHR('/api/streams?activity_id=' + activity_id)
-        .then(function(streams) {
-            var stream = streams.result.streams[activity_id];
-            activity.stream = stream;
-            return activity;
-        });
-}
-
-// Returns a promise that resolves the an array of all activities
-function load_streams(activities) {
-    var results = [];
-    for (var i = 0; i < activities.length; ++i) {
-        results.push(load_stream(activities[i]));
-    }
-    return Promise.all(results)
-        .then(function(e) { console.log("Streams loaded "); return e; });
-}
 
 // generate metadata about all the streams
 function index_streams(activities) {
@@ -80,6 +56,15 @@ function render_loop(render_context) {
     pending_render = true;
 }
 
+function RenderContext(canvas) {
+    this.renderer = new THREE.WebGLRenderer({
+            canvas: canvas
+    });
+    this.canvas = canvas;
+    this.height = 300;
+    this.width = 400;
+}
+
 /**
  * Update the map
  */
@@ -88,7 +73,7 @@ function updatemap(render_context, activities) {
     B = bounds;
 
     bounds.ready().then(function() {
-        updatescene(render_context, bounds, activities);
+        render_context.updatescene(bounds, activities);
         render_loop(render_context);
     }).catch(function(ex) { console.error(ex); });
 }
@@ -99,43 +84,35 @@ function updatemap(render_context, activities) {
  */
 function init3d(profile_page) {
     console.log("Ready with canvas on ", profile_page);
-    var canvas = profile_page.$['map-3d'];
+    var canvas = profile_page.$.canvas3d;
 
-    var context = {
-        renderer: new THREE.WebGLRenderer({
-            canvas: canvas
-        }),
-        canvas: canvas,
-        height: 300,
-        width: 400,
-    };
-    return context;
+    return new RenderContext(canvas);
 }
 
 function updatesize(render_context) {
 }
 
-function updatescene(render_context, bounds, activities) {
+RenderContext.prototype.updatescene = function(bounds, activities) {
 
-    if (!render_context.camera) {
-        render_context.camera =
+    if (!this.camera) {
+        this.camera =
             new THREE.PerspectiveCamera( 75,
-                                         render_context.width / render_context.height, 0.1, 1000 );
+                                         this.width / this.height, 0.1, 1000 );
         // Create an event listener that resizes the renderer with the browser window.
         window.addEventListener('resize', function() {
-            var rect = render_context.canvas.getBoundingClientRect();
-            //render_context.renderer.setSize(WIDTH, HEIGHT);
-            render_context.camera.aspect = rect.width / rect.height;
-            render_context.camera.updateProjectionMatrix();
+            var rect = this.canvas.getBoundingClientRect();
+            //this.renderer.setSize(WIDTH, HEIGHT);
+            this.camera.aspect = rect.width / rect.height;
+            this.camera.updateProjectionMatrix();
         });
-        render_context.controls = new THREE.OrbitControls(render_context.camera, render_context.canvas);
-        render_context.camera.up.set(0,0,1);
-        render_context.controls.addEventListener('change', function() {
+        this.controls = new THREE.OrbitControls(this.camera, this.canvas);
+        this.camera.up.set(0,0,1);
+        this.controls.addEventListener('change', function() {
             // just redraw, don't recreate the scene
-            render_loop(render_context);
-        });
+            render_loop(this);
+        }.bind(this));
     }
-    bounds.setSize(render_context.canvas.width, render_context.canvas.height);
+    bounds.setSize(this.canvas.width, this.canvas.height);
     var proximityRadius = d3.scale.linear().domain([1, bounds.maxProximity_]);
     proximityRadius.rangeRound([0, 4]);
 
@@ -144,7 +121,7 @@ function updatescene(render_context, bounds, activities) {
     var max_z = -1;
     var min_z = -1;
     var totalspheres = 0;
-    render_context.scene = new THREE.Scene();
+    this.scene = new THREE.Scene();
     activities.forEach(function(activity, index) {
         var lambertMaterial =
                 new THREE.MeshLambertMaterial( {
@@ -178,7 +155,7 @@ function updatescene(render_context, bounds, activities) {
                                                 lambertMaterial);
 
                 sphereMesh.position.set(x,y,z);
-                render_context.scene.add(sphereMesh);
+                this.scene.add(sphereMesh);
             }
         }
         //console.log("Activity ", index, " got ", spherecount, " spheres");
@@ -190,8 +167,8 @@ function updatescene(render_context, bounds, activities) {
 
         geometry.computeBoundingBox();
         var line = new THREE.Line(geometry, material);
-        render_context.scene.add(line);
-    });
+        this.scene.add(line);
+    }, this);
 
     //console.log("Total of ", totalspheres, " spheres");
     var min = {};
@@ -201,16 +178,16 @@ function updatescene(render_context, bounds, activities) {
         // super hack - we're using the fact that we haven't computed
         // the bounding boxes for the spheres to filter them out and
         // make this calcuation faster
-        max[axis] = d3.max(render_context.scene.children, function(child) {
+        max[axis] = d3.max(this.scene.children, function(child) {
             if (child.geometry.boundingBox)
                 return child.geometry.boundingBox.max[axis];
         });
-        min[axis] = d3.min(render_context.scene.children, function(child) {
+        min[axis] = d3.min(this.scene.children, function(child) {
             if (child.geometry.boundingBox)
                 return child.geometry.boundingBox.min[axis];
         });
         center[axis] = (max[axis] - min[axis])/2;
-    });
+    }, this);
 
     var vShader = document.querySelector('#vertexShader').innerText;
     var fShader = document.querySelector('#fragmentShader').innerText;
@@ -223,29 +200,29 @@ function updatescene(render_context, bounds, activities) {
             new THREE.MeshLambertMaterial( { color: 0xdddddd, shading: THREE.FlatShading } );
 
     // backing plane for visual reference
-    var planeSize = Math.min(render_context.width, render_context.height);
+    var planeSize = Math.min(this.width, this.height);
     // use planeSize when we correctly scale height/width
-    var planeGeometry = new THREE.PlaneGeometry( render_context.width, render_context.height);
+    var planeGeometry = new THREE.PlaneGeometry( this.width, this.height);
     var planeMaterial = new THREE.MeshBasicMaterial( {color: 0xaaaaaa, side: THREE.DoubleSide} );
     var plane = new THREE.Mesh( planeGeometry, lambertMaterial );
-    plane.position.x = render_context.width / 2;
-    plane.position.y = render_context.height / 2;
+    plane.position.x = this.width / 2;
+    plane.position.y = this.height / 2;
     plane.position.z = 0;
-    render_context.scene.add(plane);
+    this.scene.add(plane);
 
     var pointLight = new THREE.PointLight(0xffffff, 1);
-    pointLight.position.set(render_context.width, render_context.height, 300);
-	render_context.scene.add( new THREE.AmbientLight( 0x111111 ) );
-    render_context.scene.add( pointLight );
+    pointLight.position.set(this.width, this.height, 300);
+	this.scene.add( new THREE.AmbientLight( 0x111111 ) );
+    this.scene.add( pointLight );
 
 
     REFPLANE = plane;
     console.log("Setting camera at ", center.x, max.y*1.5, max.z);
-    render_context.camera.position.set(center.x, max.y*1.5, max.z);
-    render_context.controls.target.set(center.x, center.y, center.z);
-    render_context.camera.lookAt(center.x, center.y, center.z);
+    this.camera.position.set(center.x, max.y*1.5, max.z);
+    this.controls.target.set(center.x, center.y, center.z);
+    this.camera.lookAt(center.x, center.y, center.z);
 
-    //console.log("Kicking off render with ", render_context.scene, render_context.camera);
+    //console.log("Kicking off render with ", this.scene, this.camera);
 }
 
 // Create an XHR context that fires off progress notifications
@@ -394,15 +371,15 @@ FACETS.forEach(function(facet) {
     FACETS_BY_ID[facet.id] = facet;
 });
 
-function update_progress_indicator(waiting, complete) {
-    var profilePage = document.querySelector('#main');
-    var progress = profilePage.$.progress;
+Profile.prototype.update_progress_indicator = function(waiting, complete) {
+    var progress = this.profilePage.$.progress;
     progress.value = complete;
     progress.max = waiting;
     // TODO: Hide if complete == waiting?
 }
 
 Profile.prototype.init = function(profilePage) {
+    this.profilePage = profilePage;
     this.context = init3d(profilePage);
 
     var refreshAjax = profilePage.$['refresh-data'];
@@ -420,7 +397,7 @@ Profile.prototype.init = function(profilePage) {
     });
     console.log("Event handlers hooked up");
 
-    XHR = xhrContext(update_progress_indicator);
+    XHR = xhrContext(this.update_progress_indicator.bind(this));
 
     this.dataset = new Dataset(profilePage.$.facet_list);
 
@@ -484,11 +461,4 @@ function extract_possible_facet_values(activities) {
     return facetInfos;
 }
 
-// if (document.body.hasAttribute('unresolved')) {
-//     console.log("Waiting for polymer-ready");
-//     window.addEventListener('polymer-ready', Profile.init);
-// } else {
-//     console.log("Polymer already ready..");
-//     Promise.resolve().then(Profile.init);
-// }
 console.log("profile.js loaded, should be calling other stuff");
