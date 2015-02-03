@@ -41,21 +41,6 @@ function accessor(attr) {
     };
 }
 
-function render3d(render_context) {
-    render_context.controls.update();
-	render_context.renderer.render(render_context.scene, render_context.camera);
-    pending_render = false;
-}
-
-var pending_render = false;
-function render_loop(render_context) {
-    if (!pending_render)
-	    requestAnimationFrame(function() {
-            render3d(render_context);
-        });
-    pending_render = true;
-}
-
 function RenderContext(canvas) {
     this.renderer = new THREE.WebGLRenderer({
             canvas: canvas
@@ -65,17 +50,31 @@ function RenderContext(canvas) {
     this.width = 400;
 }
 
+
+RenderContext.prototype.render3d = function() {
+    this.controls.update();
+	this.renderer.render(this.scene, this.camera);
+    pending_render = false;
+}
+
+var pending_render = false;
+RenderContext.prototype.render_loop = function() {
+    if (!pending_render)
+	    requestAnimationFrame(this.render3d.bind(this));
+    pending_render = true;
+}
+
 /**
  * Update the map
  */
-function updatemap(render_context, activities) {
+RenderContext.prototype.updatemap = function(activities) {
     var bounds = new Bounds(activities);
     B = bounds;
 
     bounds.ready().then(function() {
-        render_context.updatescene(bounds, activities);
-        render_loop(render_context);
-    }).catch(function(ex) { console.error(ex); });
+        this.updatescene(bounds, activities);
+        this.render_loop();
+    }.bind(this)).catch(function(ex) { console.error(ex); });
 }
 
 /**
@@ -87,9 +86,6 @@ function init3d(profile_page) {
     var canvas = profile_page.$.canvas3d;
 
     return new RenderContext(canvas);
-}
-
-function updatesize(render_context) {
 }
 
 RenderContext.prototype.updatescene = function(bounds, activities) {
@@ -109,7 +105,7 @@ RenderContext.prototype.updatescene = function(bounds, activities) {
         this.camera.up.set(0,0,1);
         this.controls.addEventListener('change', function() {
             // just redraw, don't recreate the scene
-            render_loop(this);
+            this.render_loop();
         }.bind(this));
     }
     bounds.setSize(this.canvas.width, this.canvas.height);
@@ -418,7 +414,7 @@ Profile.prototype.init = function(profilePage) {
 Profile.prototype.refresh = function() {
     return this.dataset.activities()
         .then(function(activities) {
-            updatemap(this.context, activities);
+            this.context.updatemap(activities);
         }.bind(this))
         .catch(function(ex) { console.error(ex); });
 };
