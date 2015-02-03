@@ -156,3 +156,40 @@ Bounds.prototype.center = function() {
 
     return [lat_center, lng_center];
 };
+
+function accessor(attr) {
+    return function(d, i) {
+        return d[attr];
+    };
+}
+
+// generate metadata about all the streams
+function index_streams(activities) {
+    var results = [];
+    for (var i = 0; i < activities.length; ++i) {
+        results.push(index_stream(activities[i]));
+    }
+    return Promise.all(results);
+}
+
+// generate metadata about a single stream. Returns a promise of the data
+function index_stream(activity) {
+    var stream = activity.stream;
+    if (!stream) {
+        return Promise.reject(["Missing stream in ", activity]);
+    }
+    return new Promise(function(resolve, reject) {
+        var metadata = {domain: {}};
+
+        var latlng_stream = stream.latlng;
+        var alt_stream = stream.altitude;
+        if (latlng_stream && latlng_stream.data) {
+            metadata.domain.lat = d3.extent(latlng_stream.data, accessor(0));
+            metadata.domain.lng = d3.extent(latlng_stream.data, accessor(1));
+        }
+        if (alt_stream && alt_stream.data) {
+            metadata.domain.alt = d3.extent(alt_stream.data);
+        }
+        resolve(metadata);
+    });
+}
