@@ -16,8 +16,9 @@ Polymer('profile-page', {
         console.log("Loading..");
     },
     onDataLoaded: function() {
-        refreshButton.icon = 'refresh';
-        console.log("refresh Complete. Response: ", refreshAjax.response);
-        this.profilePage.refresh();
+        this.$['refresh-button'].icon = 'refresh';
+        console.log("refresh Complete. Response: ", this.$['refresh-data'].response);
+        console.log("Refresh from ", this, " and ", this.profilePage);
+        this.profile.refresh();
     },
 });
