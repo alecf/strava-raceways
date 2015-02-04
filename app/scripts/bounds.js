@@ -6,13 +6,6 @@
 function Bounds(activities, xhrContext) {
     this.xhr_ = xhrContext;
     this.activities_ = activities;
-    this.ready_ =
-        this.load_streams(activities)
-        .then(index_streams)
-        .then(this.consume_index.bind(this));
-    this.ready_.catch(function(ex) {
-        console.error("Error loading and indexing: ", ex);
-    });
 }
 
 // Get a stream and attach it to the activity. Returns a promise that
@@ -22,7 +15,7 @@ Bounds.prototype.load_stream = function(activity) {
     var activity_id = activity.activity_id;
     if (activity.stream)
         return Promise.resolve(activity);
-    return XHR('/api/streams?activity_id=' + activity_id)
+    return this.xhr_('/api/streams?activity_id=' + activity_id)
         .then(function(streams) {
             var stream = streams.result.streams[activity_id];
             activity.stream = stream;
@@ -39,13 +32,22 @@ Bounds.prototype.load_streams = function(activities) {
     }
     return Promise.all(results)
         .then(function(e) {
-            console.log("Streams loaded ");
+            console.log("Streams loaded (", results.length, ')');
             return e;
         });
 };
 
 
 Bounds.prototype.ready = function() {
+    if (!this.ready_) {
+        this.ready_ =
+            this.load_streams(this.activities_)
+            .then(index_streams)
+            .then(this.consume_index.bind(this))
+            .catch(function(ex) {
+                console.error("Error loading and indexing: ", ex);
+            });
+    }
     return this.ready_;
 };
 
@@ -72,7 +74,6 @@ Bounds.prototype.consume_index = function(stream_index) {
     // looks fine at my latitude.
 
     this.scale_x = d3.scale.linear().domain([this.x, this.x+this.width]);
-    console.log("scale_x = ", this.scale_x);
     this.scale_y = d3.scale.linear().domain([this.y+this.height, this.y]);
     this.scale_z = d3.scale.linear().domain([extents.min_alt,
                                              extents.max_alt]);

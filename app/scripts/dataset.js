@@ -1,7 +1,8 @@
-function Dataset(facetList) {
+function Dataset(facetList, xhr) {
     this.facetList = facetList;
+    this.xhr_ = xhr;
     this._pending_activities =
-        XHR('/api/activities').then(function(response) {
+        this.xhr_('/api/activities').then(function(response) {
             console.log("Got activities: ", response);
             return response.result.activities;
         });
@@ -19,7 +20,7 @@ Dataset.prototype.activities = function() {
 
 Dataset.prototype.run_filters = function(activities) {
     var result = [];
-    var filters = this.make_filters();
+    var filters = this.facetList.getFilterValues();
     console.log("Runnning filters against ", filters);
     for (var i = 0; i < activities.length; i++) {
         var activity = activities[i];
@@ -43,9 +44,6 @@ Dataset.prototype.run_filters = function(activities) {
     return result;
 }
 
-// creates a filter from the current state of the UI controls, where the filter is in the form
-// [[key, value], [key, value]]
-// the key, value will be passed to matches?
 Dataset.prototype.make_filters = function() {
     // generate filter
     console.log("List is here: ", this.facetList, " with selectors: ", this.facetList.selectors().length);

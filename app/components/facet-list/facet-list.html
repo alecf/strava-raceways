@@ -1,7 +1,6 @@
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../components/facet-selector/facet-selector.html">
 
-
 <polymer-element name="facet-list">
   <template>
     <template repeat="{{facet in facets}}">
@@ -10,26 +9,6 @@
       </facet-selector>
     </template>
   </template>
-  <script>
-   Polymer({
-     publish: { facets: [] },
-     selectors: function() {
-       return this.shadowRoot.querySelectorAll('facet-selector');
-     },
-     getFilterValues: function() {
-       var results = [];
-       var selectors = this.selectors();
-       for (var i = 0; i < selectors.length; i++) {
-         var selector = selectors[i];
-         var filters = selector.filterValues();
-         results = results.concat(filters);
-       }
-       return results;
-     },
-     onFacetValue: function(e) {
-       console.log("onFacetValue(", e, ")");
-     },
-   });
-  </script>
+  <script src="facet-list.js" defer></script>
 </polymer-element>
         

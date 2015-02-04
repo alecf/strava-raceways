@@ -105,14 +105,13 @@ Profile.prototype.update_progress_indicator = function(waiting, complete) {
 };
 
 Profile.prototype.init = function() {
-    this.context = init3d(this.profilePage.$.canvas3d);
+    this.context = new RenderContext(this.profilePage.$.canvas3d);
 
-    var refreshAjax = this.profilePage.$['refresh-data'];
     console.log("Event handlers hooked up");
 
-    XHR = XHRContext(this.update_progress_indicator.bind(this));
+    this.xhr_ = XHRContext(this.update_progress_indicator.bind(this));
 
-    this.dataset = new Dataset(this.profilePage.$.facet_list);
+    this.dataset = new Dataset(this.profilePage.$.facet_list, this.xhr_);
 
     this.dataset.raw_activities().then(function(activities) {
         console.log("Have activities from dataset: ", activities.length, " facets: ", FACETS);
@@ -127,11 +126,15 @@ Profile.prototype.init = function() {
     this.refresh();
 };
 
+/**
+ *
+ */
 Profile.prototype.refresh = function() {
     return this.dataset.activities()
         .then(function(activities) {
-            this.bounds = new Bounds(activities);
+            this.bounds = new Bounds(activities, this.xhr_);
             this.context.updatemap(this.bounds);
+            this.totalActivities = activities.length;
         }.bind(this))
         .catch(function(ex) { console.error(ex); });
 };

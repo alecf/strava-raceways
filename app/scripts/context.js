@@ -2,11 +2,6 @@
  * Setup. Returns a "rendering context" that will need to also be
  * populated with a scene and a camera.
  */
-function init3d(canvas) {
-    console.log("Ready with canvas on ", canvas);
-    return new RenderContext(canvas);
-}
-
 function RenderContext(canvas) {
     this.renderer = new THREE.WebGLRenderer({
             canvas: canvas

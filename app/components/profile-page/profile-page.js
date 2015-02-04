@@ -1,4 +1,7 @@
 Polymer('profile-page', {
+    publish: {
+        totalActivities: 0,
+    },
     facetSelected: function(e) {
         console.log("Filters should be updated with ", e.facet.id, " = ", e.value.value);
         this.profile.refresh();
