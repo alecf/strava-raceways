@@ -46,19 +46,43 @@ RenderContext.prototype.ensureCamera = function() {
             new THREE.PerspectiveCamera( 75,
                                          this.perspective(), 0.1, 1000 );
         // Create an event listener that resizes the renderer with the browser window.
-        window.addEventListener('resize', function() {
-            //this.renderer.setSize(WIDTH, HEIGHT);
-            console.log("Resizing camera, perspective = ", this.perspective());
-            this.camera.aspect = this.perspective();
-            this.camera.updateProjectionMatrix();
-        }.bind(this));
+        window.addEventListener('resize', this.onResize.bind(this));
+
         this.controls = new THREE.OrbitControls(this.camera, this.canvas);
         this.camera.up.set(0,0,1);
-        this.controls.addEventListener('change', function() {
-            // just redraw, don't recreate the scene
-            this.render_loop();
-        }.bind(this));
+        this.controls.addEventListener('change', this.onControlsChange.bind(this));
     }
+};
+
+/**
+ * Called when the user resizes the window
+ */
+RenderContext.prototype.onResize = function() {
+    //this.renderer.setSize(WIDTH, HEIGHT);
+    console.log("Resizing camera, perspective = ", this.perspective());
+    this.camera.aspect = this.perspective();
+    this.camera.updateProjectionMatrix();
+};
+
+/**
+ * Called when the user manipulates the controls (i.e. updates the camera)
+ */
+RenderContext.prototype.onControlsChange = function() {
+    // just redraw, don't recreate the scene
+    this.render_loop();
+};
+
+/**
+ * A cache of materials by color.
+ */
+RenderContext.prototype.getMaterial = function(color) {
+    if (!(color in this.materials_)) {
+        this.materials_[color] = new THREE.MeshLambertMaterial( {
+            color: color,
+            shading: THREE.FlatShading
+        } );
+    }
+    return this.materials_[color];
 };
 
 /**
@@ -183,13 +207,13 @@ RenderContext.prototype.updatescene = function(bounds, activities) {
         center[axis] = (max[axis] - min[axis])/2;
     }, this);
 
-    var vShader = document.querySelector('#vertexShader').innerText;
-    var fShader = document.querySelector('#fragmentShader').innerText;
-    var shaderMaterial =
-            new THREE.ShaderMaterial({
-                vertexShader:   vShader,
-                fragmentShader: fShader
-            });
+    // var vShader = document.querySelector('#vertexShader').innerText;
+    // var fShader = document.querySelector('#fragmentShader').innerText;
+    // var shaderMaterial =
+    //         new THREE.ShaderMaterial({
+    //             vertexShader:   vShader,
+    //             fragmentShader: fShader
+    //         });
 
     this.add_backing_plane();
 
