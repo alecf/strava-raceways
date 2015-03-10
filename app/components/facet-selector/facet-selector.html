@@ -13,9 +13,12 @@
   <template>
     <div class="label">{{facet.name}}</div>
     <core-menu id="list" on-core-select="{{valueSelected}}">
+        <core-item>
+            <paper-item noink>All</paper-item>
+        </core-item>
       <template repeat="{{value in values}}">
         <core-item>
-          <paper-item>{{value.name}} ({{value.count}})</paper-item>
+          <paper-item noink>{{value.name}} ({{value.count}})</paper-item>
         </core-item>
       </template>
     </core-menu>

@@ -7,8 +7,6 @@ function RenderContext(canvas) {
             canvas: canvas
     });
     this.canvas = canvas;
-    this.height = 300;
-    this.width = 400;
     this.materials_ = {};
 }
 
@@ -36,18 +34,24 @@ RenderContext.prototype.updatemap = function(bounds) {
     }.bind(this)).catch(function(ex) { console.error(ex); });
 };
 
+RenderContext.prototype.perspective = function() {
+    var rect = this.canvas.getBoundingClientRect();
+    return rect.width/rect.height;
+};
+
 RenderContext.prototype.ensureCamera = function() {
+    console.log("Ensuring camera, perspective = ", this.perspective());
     if (!this.camera) {
         this.camera =
             new THREE.PerspectiveCamera( 75,
-                                         this.width / this.height, 0.1, 1000 );
+                                         this.perspective(), 0.1, 1000 );
         // Create an event listener that resizes the renderer with the browser window.
         window.addEventListener('resize', function() {
-            var rect = this.canvas.getBoundingClientRect();
             //this.renderer.setSize(WIDTH, HEIGHT);
-            this.camera.aspect = rect.width / rect.height;
+            console.log("Resizing camera, perspective = ", this.perspective());
+            this.camera.aspect = this.perspective();
             this.camera.updateProjectionMatrix();
-        });
+        }.bind(this));
         this.controls = new THREE.OrbitControls(this.camera, this.canvas);
         this.camera.up.set(0,0,1);
         this.controls.addEventListener('change', function() {
@@ -57,6 +61,9 @@ RenderContext.prototype.ensureCamera = function() {
     }
 };
 
+/**
+ * A cache of materials by color.
+ */
 RenderContext.prototype.getMaterial = function(color) {
     if (!(color in this.materials_)) {
         this.materials_[color] = new THREE.MeshLambertMaterial( {
@@ -126,20 +133,22 @@ RenderContext.prototype.add_backing_plane = function() {
     var lambertMaterial =
             new THREE.MeshLambertMaterial( { color: 0xdddddd, shading: THREE.FlatShading } );
     // backing plane for visual reference
-    var planeSize = Math.min(this.width, this.height);
+    var rect = this.canvas.getBoundingClientRect();
+    var planeSize = Math.max(rect.width, rect.height);
     // use planeSize when we correctly scale height/width
-    var planeGeometry = new THREE.PlaneGeometry( this.width, this.height);
+    var planeGeometry = new THREE.PlaneGeometry( planeSize, planeSize);
     var planeMaterial = new THREE.MeshBasicMaterial( {color: 0xaaaaaa, side: THREE.DoubleSide} );
     var plane = new THREE.Mesh( planeGeometry, lambertMaterial );
-    plane.position.x = this.width / 2;
-    plane.position.y = this.height / 2;
+    plane.position.x = planeSize / 2;
+    plane.position.y = planeSize / 2;
     plane.position.z = 0;
     this.scene.add(plane);
 };
 
 RenderContext.prototype.add_light = function() {
+    var rect = this.canvas.getBoundingClientRect();
     var pointLight = new THREE.PointLight(0xffffff, 1);
-    pointLight.position.set(this.width, this.height, 300);
+    pointLight.position.set(rect.width, rect.height, 300);
 	this.scene.add( new THREE.AmbientLight( 0x111111 ) );
     this.scene.add( pointLight );
 };
@@ -147,7 +156,8 @@ RenderContext.prototype.add_light = function() {
 RenderContext.prototype.updatescene = function(bounds, activities) {
 
     this.ensureCamera();
-    bounds.setSize(this.canvas.width, this.canvas.height);
+    var rect = this.canvas.getBoundingClientRect();
+    bounds.setSize(rect.width, rect.height);
 
     var max_z = -1;
     var min_z = -1;

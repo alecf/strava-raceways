@@ -31,7 +31,9 @@ Dataset.prototype.run_filters = function(activities) {
             var facet_value = filter[1];
 
             var activity_value = facet.extract(facet.keyPath, activity);
-            if (!facet.matches(facet_value, activity_value)) {
+            // Should this be handled by facet.matches?
+            if (facet_value != null &&
+                !facet.matches(facet_value, activity_value)) {
                 matches = false;
                 break;
             }

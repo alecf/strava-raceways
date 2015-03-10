@@ -15,6 +15,7 @@ Polymer('facet-selector', {
             var dataItem = coreItem.templateInstance.model.value;
             // surely there's a better way to test selection?
             if (coreItem.classList.contains('core-selected')) {
+                var value = dataItem ? dataItem.value : null;
                 results.push([this.facet, dataItem.value]);
             }
         }
@@ -23,6 +24,7 @@ Polymer('facet-selector', {
     },
     valueSelected: function(e) {
         console.log("Value selected:", e);
+        console.log("templateInstance: ", e.detail.item.templateInstance);
         var model = e.detail.item.templateInstance.model;
         e.stopPropagation();
         var facetEvent = new CustomEvent('facet-value');

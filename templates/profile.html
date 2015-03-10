@@ -10,10 +10,10 @@
 
 <body unresolved fullbleed>
   <profile-page id="main"></profile-page>
-    <script type="text/javascript" defer async>
+    <script type="text/javascript">
      var athlete = {{json.dumps(athlete, indent=4, sort_keys=True)|safe}}
     </script>
-    <script src="/scripts/eventloop.js" async></script>
+    <!--<script src="/scripts/eventloop.js" defer></script>-->
 <!--    <script src="/bower_components/jquery/dist/jquery.min.js"></script> -->
 
     <script id="vertexShader" type="x-shader/x-vertex">
