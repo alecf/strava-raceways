@@ -85,6 +85,7 @@ RenderContext.prototype.getMaterial = function(color) {
     return this.materials_[color];
 };
 
+
 RenderContext.prototype.add_activities_to_scene = function(bounds, activities) {
     var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
 
@@ -105,8 +106,9 @@ RenderContext.prototype.add_activities_to_scene = function(bounds, activities) {
             var altitude = activity.stream.altitude.data[i];
             var proximity = activity.stream.proximity.data[i];
 
-            var x = bounds.scale_x(point[1]);
-            var y = bounds.scale_y(point[0]);
+            var xy = bounds.projection([point[1], point[0]]);
+            var x = xy[0];
+            var y = xy[1];
             var z = bounds.scale_z(altitude);
 
             geometry.vertices.push(new THREE.Vector3(x, y, z));
