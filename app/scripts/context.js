@@ -10,6 +10,7 @@ function RenderContext(canvas) {
     this.materials_ = {};
     this.pending_render = false;
 }
+RenderContext.MAX_SPHERES = 0;
 
 RenderContext.prototype.render3d = function() {
     this.controls.update();
@@ -114,7 +115,7 @@ RenderContext.prototype.add_activities_to_scene = function(bounds, activities) {
             var radius = proximityRadius(proximity);
             if (proximity > 1 &&
                 radius >= 1 &&
-                totalspheres < 2000 && // ugh artificial
+                totalspheres < RenderContext.MAX_SPHERES && // ugh artificial
                 !(i % 30)) {    //also artificial
                 spherecount++;
                 var sphere = new THREE.SphereGeometry(radius);
