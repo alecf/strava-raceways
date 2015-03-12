@@ -18,6 +18,19 @@ Bounds.prototype.load_stream = function(activity) {
     return this.xhr_('/api/streams?activity_id=' + activity_id)
         .then(function(streams) {
             var stream = streams.result.streams[activity_id];
+            var geojson = {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: stream.latlng.data.map(function(latlng) {
+                            // geojson uses lnglat
+                            return [latlng[1], latlng[0]];
+                        })
+                    }
+                };
+            stream.geojson = geojson;
+            //console.log("Making geojson: ", stream.geojson);
+
             activity.stream = stream;
             return activity;
         });
@@ -77,7 +90,8 @@ Bounds.prototype.consume_index = function(stream_index) {
     this.scale_y = d3.scale.linear().domain([this.y+this.height, this.y]);
     this.scale_z = d3.scale.linear().domain([extents.min_alt,
                                              extents.max_alt]);
-
+    console.log("Got [", this.x, ", ", this.x + this.width, "], [", this.y, ", ",
+                this.y + this.height, "]");
     this.generate_proximity_streams(20);
 };
 
@@ -91,7 +105,10 @@ Bounds.prototype.withGeoData = function(callback) {
                            activity.stream.altitude.data);
         return zipped.map(function(streamdata) {
             // streamdata is [latlng, altitude]
-            return callback.call(this, streamdata[0][0], streamdata[0][1], streamdata[1], i);
+            return callback.call(this,
+                                 streamdata[0][0],
+                                 streamdata[0][1],
+                                 streamdata[1], i);
         });
     });
 };
@@ -126,8 +143,11 @@ Bounds.prototype.generate_proximity_streams = function(n) {
     // this is kind of a map-reduce style index: count up all
     // lat/lng/altitude combos, then redistribute the counts out to
     // each stream.
+
+    // Accumulate counts (map)
     this.withGeoData(inc);
 
+    // Now summarize (reduce)
     var proximities = this.withGeoData(val);
 
     // now reintegrate them into the existing activities
@@ -136,6 +156,7 @@ Bounds.prototype.generate_proximity_streams = function(n) {
         var proximity = actprox[1];
         activity.stream.proximity = { data: proximity };
     });
+
 
     // we keep a max so that the proximity shapes have a size range;
     this.maxProximity_ = _(proximities).flatten().max();

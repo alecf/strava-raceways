@@ -8,20 +8,19 @@ function RenderContext(canvas) {
     });
     this.canvas = canvas;
     this.materials_ = {};
+    this.pending_render = false;
 }
-
 
 RenderContext.prototype.render3d = function() {
     this.controls.update();
 	this.renderer.render(this.scene, this.camera);
-    pending_render = false;
+    this.pending_render = false;
 };
 
-var pending_render = false;
 RenderContext.prototype.render_loop = function() {
-    if (!pending_render)
+    if (!this.pending_render)
 	    requestAnimationFrame(this.render3d.bind(this));
-    pending_render = true;
+    this.pending_render = true;
 };
 
 /**
@@ -70,19 +69,6 @@ RenderContext.prototype.onResize = function() {
 RenderContext.prototype.onControlsChange = function() {
     // just redraw, don't recreate the scene
     this.render_loop();
-};
-
-/**
- * A cache of materials by color.
- */
-RenderContext.prototype.getMaterial = function(color) {
-    if (!(color in this.materials_)) {
-        this.materials_[color] = new THREE.MeshLambertMaterial( {
-            color: color,
-            shading: THREE.FlatShading
-        } );
-    }
-    return this.materials_[color];
 };
 
 /**
@@ -226,4 +212,104 @@ RenderContext.prototype.updatescene = function(bounds, activities) {
     this.camera.lookAt(center.x, center.y, center.z);
 
     //console.log("Kicking off render with ", this.scene, this.camera);
+};
+
+
+function RenderContext2d(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    console.log("Got context ", this.ctx, " from ", canvas);
+    this.pending_render = false;
+    window.addEventListener('resize', this.onResize.bind(this));
+    this.onResize();
+}
+
+RenderContext2d.prototype.onResize = function(event) {
+    var rect = this.canvas.getBoundingClientRect();
+    this.canvas.setAttribute("width", rect.width);
+    this.canvas.setAttribute("height", rect.height);
+    console.log("Resized to ", rect.width, ", ", rect.height);
+};
+
+RenderContext2d.prototype.updatemap = function(bounds) {
+    bounds.ready().then(function() {
+        this.updatescene(bounds, bounds.activities());
+        this.render_loop();
+    }.bind(this)).catch(function(ex) { console.error(ex); });
+};
+
+RenderContext2d.prototype.updatescene = function(bounds, activities) {
+    var rect = this.canvas.getBoundingClientRect();
+    console.log("Setting 2d size to ", rect.width, ", ", rect.height, " from ", this.ctx);
+    bounds.setSize(rect.width, rect.height);
+    this.ctx.fillStyle = '#fff';
+    this.ctx.strokeStyle = 'black';
+    this.ctx.fillRect(0, 0, rect.width, rect.height);
+    this.ctx.stroke();
+
+    var activityjson = {
+        type: 'FeatureCollection',
+    };
+    activityjson.features = activities.map(function(activity) {
+        return activity.stream.geojson;
+    });
+    var projection = get_best_projection(rect.width, rect.height, activityjson);
+    P = projection;
+    A = activities;
+    activities.forEach(function(activity) {
+        var path = d3.geo.path().projection(projection);
+        path.context(this.ctx);
+        this.ctx.beginPath();
+        var p = path(activity.stream.geojson);
+        if (p) {
+            console.warn("Got path: ", p.length);
+        }
+        this.ctx.stroke();
+        this.ctx.closePath();
+        console.log("Creating path for ", activity);
+        LP = path;
+        LA = activity;
+    }, this);
+};
+
+
+/**
+ *
+ */
+function get_best_projection(width, height, features) {
+    //var center = d3.geo.centroid(features);
+    var scale = 1;            // strawman
+    var offset = [0,0];
+
+    var projection = d3.geo.albers()
+            .scale(scale)
+            //.center(center)
+            .translate(offset);
+
+    var path = d3.geo.path().projection(projection);
+    var bounds = path.bounds(features);
+
+    scale = 1/Math.max((bounds[1][0] - bounds[0][0]) / width,
+                       (bounds[1][1] - bounds[0][1]) / height);
+    offset = [(width - scale*(bounds[1][0] + bounds[0][0]))/2,
+              (height - scale*(bounds[1][1] + bounds[0][1]))/2];
+    // now create a new projection
+    projection
+        .scale(scale)
+        .translate(offset);
+    console.log("Created projection:",
+                "\n  scale = ", scale,
+                "\n  translate = ", offset);
+    return projection;
+}
+
+
+RenderContext2d.prototype.render_loop = function() {
+    if (!this.pending_render)
+	    requestAnimationFrame(this.render.bind(this));
+    this.pending_render = true;
+};
+
+RenderContext2d.prototype.render = function() {
+
 };

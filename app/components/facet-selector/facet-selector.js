@@ -16,7 +16,7 @@ Polymer('facet-selector', {
             // surely there's a better way to test selection?
             if (coreItem.classList.contains('core-selected')) {
                 var value = dataItem ? dataItem.value : null;
-                results.push([this.facet, dataItem.value]);
+                results.push([this.facet, value]);
             }
         }
 

@@ -106,6 +106,7 @@ Profile.prototype.update_progress_indicator = function(waiting, complete) {
 
 Profile.prototype.init = function() {
     this.context = new RenderContext(this.profilePage.$.canvas3d);
+    this.context2d = new RenderContext2d(this.profilePage.$.canvas2d);
 
     console.log("Event handlers hooked up");
 
@@ -134,6 +135,7 @@ Profile.prototype.refresh = function() {
         .then(function(activities) {
             this.bounds = new Bounds(activities, this.xhr_);
             this.context.updatemap(this.bounds);
+            this.context2d.updatemap(this.bounds);
             this.totalActivities = activities.length;
         }.bind(this))
         .catch(function(ex) { console.error(ex); });
