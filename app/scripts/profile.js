@@ -92,8 +92,9 @@ FACETS.forEach(function(facet) {
     FACETS_BY_ID[facet.id] = facet;
 });
 
-function Profile(profilePage) {
+function Profile(profilePage, resolution) {
     this.profilePage = profilePage;
+    this.resolution = resolution;
 }
 
 
@@ -107,8 +108,6 @@ Profile.prototype.update_progress_indicator = function(waiting, complete) {
 Profile.prototype.init = function() {
     this.context = new RenderContext(this.profilePage.$.canvas3d);
     this.context2d = new RenderContext2d(this.profilePage.$.canvas2d);
-
-    console.log("Event handlers hooked up");
 
     this.xhr_ = XHRContext(this.update_progress_indicator.bind(this));
 
@@ -131,9 +130,10 @@ Profile.prototype.init = function() {
  *
  */
 Profile.prototype.refresh = function() {
+    console.log("Refreshing...");
     return this.dataset.activities()
         .then(function(activities) {
-            this.bounds = new Bounds(activities, this.xhr_);
+            this.bounds = new Bounds(activities, this.xhr_, this.resolution);
             this.context.updatemap(this.bounds);
             this.context2d.updatemap(this.bounds);
             this.totalActivities = activities.length;

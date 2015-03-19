@@ -48,8 +48,8 @@ RenderContext.prototype.ensureCamera = function() {
         // Create an event listener that resizes the renderer with the browser window.
         window.addEventListener('resize', this.onResize.bind(this));
 
-        this.controls = new THREE.OrbitControls(this.camera, this.canvas);
         this.camera.up.set(0,0,1);
+        this.controls = new THREE.OrbitControls(this.camera, this.canvas);
         this.controls.addEventListener('change', this.onControlsChange.bind(this));
     }
 };
@@ -250,61 +250,34 @@ RenderContext2d.prototype.updatescene = function(bounds, activities) {
     this.ctx.fillRect(0, 0, rect.width, rect.height);
     this.ctx.stroke();
 
-    var activityjson = {
-        type: 'FeatureCollection',
-    };
-    activityjson.features = activities.map(function(activity) {
-        return activity.stream.geojson;
-    });
-    var projection = get_best_projection(rect.width, rect.height, activityjson);
-    P = projection;
+    P = bounds.projection;
     A = activities;
+    var path = d3.geo.path().projection(bounds.projection);
+    path.context(this.ctx);
     activities.forEach(function(activity) {
-        var path = d3.geo.path().projection(projection);
-        path.context(this.ctx);
         this.ctx.beginPath();
-        var p = path(activity.stream.geojson);
-        if (p) {
-            console.warn("Got path: ", p.length);
-        }
+        // actually write to the context
+        path(activity.stream.geojson);
         this.ctx.stroke();
         this.ctx.closePath();
         console.log("Creating path for ", activity);
         LP = path;
         LA = activity;
     }, this);
+
+    // make some vornoi!
+    var voronoi = d3.geom.voronoi()
+            .clipExtent([[0,0], [rect.width, rect.height]]);
+
+    var coordinates = _(activities).pluck('stream')
+        .pluck('geojson')
+        .pluck('geometry')
+            .pluck('coordinates')
+            .flatten(true)
+        .value();
+    LC = coordinates;
 };
 
-
-/**
- *
- */
-function get_best_projection(width, height, features) {
-    //var center = d3.geo.centroid(features);
-    var scale = 1;            // strawman
-    var offset = [0,0];
-
-    var projection = d3.geo.albers()
-            .scale(scale)
-            //.center(center)
-            .translate(offset);
-
-    var path = d3.geo.path().projection(projection);
-    var bounds = path.bounds(features);
-
-    scale = 1/Math.max((bounds[1][0] - bounds[0][0]) / width,
-                       (bounds[1][1] - bounds[0][1]) / height);
-    offset = [(width - scale*(bounds[1][0] + bounds[0][0]))/2,
-              (height - scale*(bounds[1][1] + bounds[0][1]))/2];
-    // now create a new projection
-    projection
-        .scale(scale)
-        .translate(offset);
-    console.log("Created projection:",
-                "\n  scale = ", scale,
-                "\n  translate = ", offset);
-    return projection;
-}
 
 
 RenderContext2d.prototype.render_loop = function() {

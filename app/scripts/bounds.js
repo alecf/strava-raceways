@@ -3,9 +3,10 @@
 
 // requires d3.js and lodash
 
-function Bounds(activities, xhrContext) {
+function Bounds(activities, xhrContext, resolution) {
     this.xhr_ = xhrContext;
     this.activities_ = activities;
+    this.resolution = resolution;
 }
 
 // Get a stream and attach it to the activity. Returns a promise that
@@ -15,16 +16,18 @@ Bounds.prototype.load_stream = function(activity) {
     var activity_id = activity.activity_id;
     if (activity.stream)
         return Promise.resolve(activity);
-    return this.xhr_('/api/streams?activity_id=' + activity_id)
+    return this.xhr_('/api/streams', {activity_id: activity_id,
+                                      resolution: this.resolution })
         .then(function(streams) {
             var stream = streams.result.streams[activity_id];
             var geojson = {
                     type: 'Feature',
                     geometry: {
                         type: 'LineString',
-                        coordinates: stream.latlng.data.map(function(latlng) {
+                        coordinates: stream.latlng.data.map(function(latlng, i) {
                             // geojson uses lnglat
-                            return [latlng[1], latlng[0]];
+                            return [latlng[1], latlng[0],
+                                    stream.altitude.data[i]];
                         })
                     }
                 };
@@ -79,17 +82,19 @@ Bounds.prototype.consume_index = function(stream_indexes) {
     }));
 
     var extents = this.extents_ = {
-        min_lat: d3.min(stream_indexes, function(d) { return d.domain.lat[0]; }),
-        max_lat: d3.max(stream_indexes, function(d) { return d.domain.lat[1]; }),
-        min_lng: d3.min(stream_indexes, function(d) { return d.domain.lng[0]; }),
-        max_lng: d3.max(stream_indexes, function(d) { return d.domain.lng[1]; }),
-        min_alt: d3.min(stream_indexes, function(d) { return d.domain.alt[0]; }),
-        max_alt: d3.max(stream_indexes, function(d) { return d.domain.alt[1]; }),
+        min_lat: d3.min(stream_indexes,
+                        function(d) { return d.domain.lat[0]; }),
+        max_lat: d3.max(stream_indexes,
+                        function(d) { return d.domain.lat[1]; }),
+        min_lng: d3.min(stream_indexes,
+                        function(d) { return d.domain.lng[0]; }),
+        max_lng: d3.max(stream_indexes,
+                        function(d) { return d.domain.lng[1]; }),
+        min_alt: d3.min(stream_indexes,
+                        function(d) { return d.domain.alt[0]; }),
+        max_alt: d3.max(stream_indexes,
+                        function(d) { return d.domain.alt[1]; }),
     };
-
-    // todo: use a projection to make sure the x/y are scaled
-    // appropriately. For demonstration purposes, a 1:1 projection
-    // looks fine at my latitude.
 
     this.scale_z = d3.scale.linear().domain([extents.min_alt,
                                              extents.max_alt]);
@@ -102,15 +107,14 @@ Bounds.prototype.activities = function() {
 
 Bounds.prototype.withGeoData = function(callback) {
     return this.activities_.map(function(activity, i) {
-        var zipped = _.zip(activity.stream.latlng.data,
-                           activity.stream.altitude.data);
-        return zipped.map(function(streamdata) {
-            // streamdata is [latlng, altitude]
+        var coordinates = activity.stream.geojson.geometry.coordinates;
+        return coordinates.map(function(coordinates) {
             return callback.call(this,
-                                 streamdata[0][0],
-                                 streamdata[0][1],
-                                 streamdata[1], i);
-        });
+                                 coordinates[1], // lat
+                                 coordinates[0], // lng
+                                 coordinates[2], // alt
+                                 i);
+         });
     });
 };
 
@@ -127,7 +131,7 @@ Bounds.prototype.generate_proximity_streams = function(n) {
     var bucket_z = this.scale_z.copy().rangeRound([0, n]).clamp(true);
 
     var bucketCount = {};
-    function inc(lat, lng,alt,id) {
+    function inc(lat, lng, alt, id) {
         lng = bucket_lng(lng);
         lat = bucket_lat(lat);
         var z = bucket_z(alt);
@@ -154,7 +158,7 @@ Bounds.prototype.generate_proximity_streams = function(n) {
 
     // Now summarize (reduce)
     var proximities = this.withGeoData(val);
-
+    console.log("Made proximities: ", proximities);
     // now reintegrate them into the existing activities
     _.zip(this.activities_, proximities).forEach(function(actprox) {
         var activity = actprox[0];
@@ -173,9 +177,7 @@ Bounds.prototype.generate_proximity_streams = function(n) {
 };
 
 Bounds.prototype.setSize = function(width, height) {
-    var minSize = Math.min(width, height);
     this.scale_z.range([100, 200]); // lower number = darker = lower altitude
-
     this.projection = get_best_projection(width, height, this.features);
 };
 
@@ -215,4 +217,34 @@ function index_stream(activity) {
         }
         resolve(metadata);
     });
+}
+
+/**
+ * Given a set of geojson features, and a height/width to project
+ * into, get the best geo projection.
+ */
+function get_best_projection(width, height, features) {
+    //var center = d3.geo.centroid(features);
+    var scale = 1;            // strawman
+    var offset = [0,0];
+
+    var projection = d3.geo.albers()
+            .scale(scale)
+            .translate(offset);
+
+    var path = d3.geo.path().projection(projection);
+    var bounds = path.bounds(features);
+
+    // readjust scale and offset, now that we know where 1 and [0,0]
+    // takes us.
+    scale = .95/Math.max((bounds[1][0] - bounds[0][0]) / width,
+                       (bounds[1][1] - bounds[0][1]) / height);
+    offset = [(width - scale*(bounds[1][0] + bounds[0][0]))/2,
+              (height - scale*(bounds[1][1] + bounds[0][1]))/2];
+
+    // now create a new projection
+    projection
+        .scale(scale)
+        .translate(offset);
+    return projection;
 }

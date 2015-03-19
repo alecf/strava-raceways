@@ -4,6 +4,8 @@ import httplib2
 from stravalib import unithelper
 from functools import wraps
 from datetime import datetime
+import urlparse
+import urllib
 import time
 import json
 import traceback
@@ -99,6 +101,17 @@ def authorized(f):
         return f(self, *args, **kwds)
     return wrapper
 
+def ReconstructURL(url, params):
+    url_parts = list(urlparse.urlparse(url))
+    query = dict(urlparse.parse_qsl(url_parts[4]))
+    for key, value in params.iteritems():
+        if key not in query:
+            query[key] = [value]
+        else:
+            query[key].append(value)
+    url_parts[4] = urllib.urlencode(query, doseq=True)
+    return urlparse.urlunparse(url_parts)
+
 class AuthRequestContext(object):
     """
     Perform asynchronous requests to a given url given a set of
@@ -114,6 +127,7 @@ class AuthRequestContext(object):
         """
         Same semantics as _urlfetch except that it stores the futures for later
         """
+        # url = ReconstructURL(url, kwds)
         ctx = ndb.get_context()
         future = ctx.urlfetch(url, **kwds)
         self.request_futures.add(future)

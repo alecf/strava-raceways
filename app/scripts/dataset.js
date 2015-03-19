@@ -1,4 +1,4 @@
-function Dataset(facetList, xhr) {
+function Dataset(facetList, xhr, resolution) {
     this.facetList = facetList;
     this.xhr_ = xhr;
     this._pending_activities =

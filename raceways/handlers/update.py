@@ -41,13 +41,20 @@ class UpdateHandler(BaseHandler):
         except ValueError as e:
             per_page = 10
 
-        resolution = self.request.get('resolution', None)
+        resolution = self.request.get('resolution', 'high')
 
         pending_writes = []
 
         athlete = model.Athlete.get_by_id(id=athlete_id)
 
-        activities = yield self.arc.urlfetch(api_call('athlete/activities', id=athlete_id, per_page=per_page))
+        print "Requesting API call: %s" % api_call('athlete/activities',
+                                                      id=athlete_id,
+                                                      per_page=per_page,
+                                                      resolution=resolution)
+        activities = yield self.arc.urlfetch(api_call('athlete/activities',
+                                                      id=athlete_id,
+                                                      per_page=per_page,
+                                                      resolution=resolution))
 
         strava_activities = json.loads(activities.content)
         result['total_activities'] = len(strava_activities)
@@ -101,7 +108,8 @@ class UpdateHandler(BaseHandler):
                 print "Have latlng and altitude for {}".format(activity_record.key.id())
 
         print "Missing {} streams, fetching".format(len(stream_requests))
-        pending_stream_requests = yield self.fetch_streams(stream_requests)
+        pending_stream_requests = yield self.fetch_streams(
+            stream_requests, resolution=resolution)
 
         while pending_stream_requests:
             f = ndb.Future.wait_any(pending_stream_requests.keys())
@@ -130,7 +138,11 @@ class UpdateHandler(BaseHandler):
     def fetch_streams(self, activity_ids, resolution=None):
         pending_stream_requests = {}
         for id in activity_ids:
-            f = self.arc.urlfetch(api_call('activities/{}/streams/latlng,altitude'.format(id), resolution=resolution))
+            print "STREAM: %s "% api_call('activities/{}/streams/latlng,altitude'.format(id),
+                         resolution=resolution)
+            f = self.arc.urlfetch(
+                api_call('activities/{}/streams/latlng,altitude'.format(id),
+                         resolution=resolution))
             pending_stream_requests[f] = id
 
         raise ndb.Return(pending_stream_requests)

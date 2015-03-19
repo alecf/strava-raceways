@@ -15,10 +15,19 @@ function XHRContext(progress) {
             total_started = total_complete = 0;
     }
 
-    return function(url) {
+    return function(url, params) {
         total_started += 1;
         progress(total_started, total_complete);
         var xhr = new XMLHttpRequest();
+        if (params) {
+            var p = [];
+            for (var key in params) {
+                var value = params[key] || '';
+                p.push(encodeURIComponent(key) + '=' +
+                       encodeURIComponent(value));
+            }
+            url += '?' + p.join('&');
+        }
         var p = new Promise(function(resolve, reject) {
             try {
                 LASTXHR = xhr;
