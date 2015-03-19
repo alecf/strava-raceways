@@ -27,9 +27,9 @@ RenderContext.prototype.render_loop = function() {
 /**
  * Update the map
  */
-RenderContext.prototype.updatemap = function(bounds) {
-    bounds.ready().then(function() {
-        this.updatescene(bounds, bounds.activities());
+RenderContext.prototype.updatemap = function(streamset) {
+    streamset.ready().then(function() {
+        this.updatescene(streamset);
         this.render_loop();
     }.bind(this)).catch(function(ex) { console.error(ex); });
 };
@@ -86,16 +86,16 @@ RenderContext.prototype.getMaterial = function(color) {
 };
 
 
-RenderContext.prototype.add_activities_to_scene = function(bounds, activities) {
+RenderContext.prototype.add_activities_to_scene = function(streamset) {
     var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
 
-    var proximityRadius = d3.scale.linear().domain([1, bounds.maxProximity_]);
+    var proximityRadius = d3.scale.linear().domain([1, streamset.maxProximity_]);
     proximityRadius.rangeRound([0, 4]);
 
     var totalspheres = 0;
     var materials = {};
 
-    activities.forEach(function(activity, index) {
+    streamset.activities().forEach(function(activity, index) {
         var lambertMaterial = this.getMaterial(color(index));
 
         //console.log("drawing activity ", index, ": ", activity);
@@ -106,10 +106,10 @@ RenderContext.prototype.add_activities_to_scene = function(bounds, activities) {
             var altitude = activity.stream.altitude.data[i];
             var proximity = activity.stream.proximity.data[i];
 
-            var xy = bounds.projection([point[1], point[0]]);
+            var xy = streamset.projection([point[1], point[0]]);
             var x = xy[0];
             var y = xy[1];
-            var z = bounds.scale_z(altitude);
+            var z = streamset.scale_z(altitude);
 
             geometry.vertices.push(new THREE.Vector3(x, y, z));
 
@@ -166,16 +166,16 @@ RenderContext.prototype.add_light = function() {
     this.scene.add( pointLight );
 };
 
-RenderContext.prototype.updatescene = function(bounds, activities) {
+RenderContext.prototype.updatescene = function(streamset) {
 
     this.ensureCamera();
     var rect = this.canvas.getBoundingClientRect();
-    bounds.setSize(rect.width, rect.height);
+    streamset.setSize(rect.width, rect.height);
 
     var max_z = -1;
     var min_z = -1;
     this.scene = new THREE.Scene();
-    this.add_activities_to_scene(bounds, activities);
+    this.add_activities_to_scene(streamset);
 
     //console.log("Total of ", totalspheres, " spheres");
     var min = {};
@@ -234,27 +234,30 @@ RenderContext2d.prototype.onResize = function(event) {
     console.log("Resized to ", rect.width, ", ", rect.height);
 };
 
-RenderContext2d.prototype.updatemap = function(bounds) {
-    bounds.ready().then(function() {
-        this.updatescene(bounds, bounds.activities());
+RenderContext2d.prototype.updatemap = function(streamset) {
+    streamset.ready().then(function() {
+        this.updatescene(streamset);
         this.render_loop();
     }.bind(this)).catch(function(ex) { console.error(ex); });
 };
 
-RenderContext2d.prototype.updatescene = function(bounds, activities) {
+RenderContext2d.prototype.updatescene = function(streamset) {
     var rect = this.canvas.getBoundingClientRect();
     console.log("Setting 2d size to ", rect.width, ", ", rect.height, " from ", this.ctx);
-    bounds.setSize(rect.width, rect.height);
-    this.ctx.fillStyle = '#fff';
-    this.ctx.strokeStyle = 'black';
-    this.ctx.fillRect(0, 0, rect.width, rect.height);
-    this.ctx.stroke();
+    streamset.setSize(rect.width, rect.height);
 
-    P = bounds.projection;
-    A = activities;
-    var path = d3.geo.path().projection(bounds.projection);
+    this.ctx.fillStyle = '#fff';
+    this.ctx.fillRect(0, 0, rect.width, rect.height);
+
+    this.draw_background(rect, streamset);
+
+    this.ctx.strokeStyle = 'black';
+        this.ctx.stroke();
+    P = streamset.projection;
+    A = streamset.activities();
+    var path = d3.geo.path().projection(streamset.projection);
     path.context(this.ctx);
-    activities.forEach(function(activity) {
+    streamset.activities().forEach(function(activity) {
         this.ctx.beginPath();
         // actually write to the context
         path(activity.stream.geojson);
@@ -265,17 +268,40 @@ RenderContext2d.prototype.updatescene = function(bounds, activities) {
         LA = activity;
     }, this);
 
+};
+
+RenderContext2d.prototype.draw_background = function(rect, streamset) {
     // make some vornoi!
     var voronoi = d3.geom.voronoi()
             .clipExtent([[0,0], [rect.width, rect.height]]);
 
-    var coordinates = _(activities).pluck('stream')
-        .pluck('geojson')
-        .pluck('geometry')
-            .pluck('coordinates')
-            .flatten(true)
-        .value();
+
+    P = streamset.projection;
     LC = coordinates;
+    V = voronoi;
+    var coordinates = _(streamset.activities()).pluck('stream')
+            .pluck('geojson')
+            .pluck('geometry')
+            .pluck('coordinates')
+            .value();
+    coordinates = _.reduceRight(coordinates,
+                                function(a,b) { return a.concat(b); }, []);
+
+    // convert to screen space
+    coordinates = coordinates.map(streamset.projection);
+
+    this.ctx.strokeStyle = '#aaa';
+    var polygons = voronoi(coordinates);
+    polygons.forEach(function(polygon) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+        polygon.forEach(function(point) {
+            this.ctx.lineTo(point[0], point[1]);
+        }, this);
+        this.ctx.closePath();
+        this.ctx.stroke();
+    }, this);
+
 };
 
 

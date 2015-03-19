@@ -133,7 +133,7 @@ Profile.prototype.refresh = function() {
     console.log("Refreshing...");
     return this.dataset.activities()
         .then(function(activities) {
-            this.bounds = new Bounds(activities, this.xhr_, this.resolution);
+            this.bounds = new StreamSet(activities, this.xhr_, this.resolution);
             this.context.updatemap(this.bounds);
             this.context2d.updatemap(this.bounds);
             this.totalActivities = activities.length;

@@ -1,9 +1,9 @@
-// an object that represents the bounds of a map
-// note that there is no projection here
+// an object that represents a set of streams, and metadata about
+// those streams.
 
 // requires d3.js and lodash
 
-function Bounds(activities, xhrContext, resolution) {
+function StreamSet(activities, xhrContext, resolution) {
     this.xhr_ = xhrContext;
     this.activities_ = activities;
     this.resolution = resolution;
@@ -12,7 +12,7 @@ function Bounds(activities, xhrContext, resolution) {
 // Get a stream and attach it to the activity. Returns a promise that
 // resolves to a copy of the activity, and a 'stream' property with
 // stream data.
-Bounds.prototype.load_stream = function(activity) {
+StreamSet.prototype.load_stream = function(activity) {
     var activity_id = activity.activity_id;
     if (activity.stream)
         return Promise.resolve(activity);
@@ -41,7 +41,7 @@ Bounds.prototype.load_stream = function(activity) {
 
 
 // Returns a promise that resolves the an array of all activities
-Bounds.prototype.load_streams = function(activities) {
+StreamSet.prototype.load_streams = function(activities) {
     var results = [];
     for (var i = 0; i < activities.length; ++i) {
         results.push(this.load_stream(activities[i]));
@@ -54,7 +54,7 @@ Bounds.prototype.load_streams = function(activities) {
 };
 
 
-Bounds.prototype.ready = function() {
+StreamSet.prototype.ready = function() {
     if (!this.ready_) {
         this.ready_ =
             this.load_streams(this.activities_)
@@ -75,7 +75,7 @@ function join_geojsons(geojsons) {
 }
 
 // xxx need a better name
-Bounds.prototype.consume_index = function(stream_indexes) {
+StreamSet.prototype.consume_index = function(stream_indexes) {
 
     this.features = join_geojsons(stream_indexes.map(function(metadata) {
         return metadata.geojson;
@@ -101,11 +101,11 @@ Bounds.prototype.consume_index = function(stream_indexes) {
     this.generate_proximity_streams(20);
 };
 
-Bounds.prototype.activities = function() {
+StreamSet.prototype.activities = function() {
     return this.activities_;
 };
 
-Bounds.prototype.withGeoData = function(callback) {
+StreamSet.prototype.withGeoData = function(callback) {
     return this.activities_.map(function(activity, i) {
         var coordinates = activity.stream.geojson.geometry.coordinates;
         return coordinates.map(function(coordinates) {
@@ -120,7 +120,7 @@ Bounds.prototype.withGeoData = function(callback) {
 
 // adds a 'proximity' stream to each activity
 // A proximity stream is
-Bounds.prototype.generate_proximity_streams = function(n) {
+StreamSet.prototype.generate_proximity_streams = function(n) {
     // first index the 3d space
     var bucket_lng = d3.scale.linear().domain([this.extents_.min_lng,
                                                this.extents_.max_lng])
@@ -176,7 +176,7 @@ Bounds.prototype.generate_proximity_streams = function(n) {
     this.bucketCount_ = bucketCount;
 };
 
-Bounds.prototype.setSize = function(width, height) {
+StreamSet.prototype.setSize = function(width, height) {
     this.scale_z.range([100, 200]); // lower number = darker = lower altitude
     this.projection = get_best_projection(width, height, this.features);
 };
