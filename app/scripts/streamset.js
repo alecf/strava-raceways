@@ -2,6 +2,7 @@
 // those streams.
 
 // requires d3.js and lodash
+StreamSet = (function() {
 
 function StreamSet(activities, xhrContext, resolution) {
     this.xhr_ = xhrContext;
@@ -176,11 +177,6 @@ StreamSet.prototype.generate_proximity_streams = function(n) {
     this.bucketCount_ = bucketCount;
 };
 
-StreamSet.prototype.setSize = function(width, height) {
-    this.scale_z.range([100, 200]); // lower number = darker = lower altitude
-    this.projection = get_best_projection(width, height, this.features);
-};
-
 function accessor(attr) {
     return function(d, i) {
         return d[attr];
@@ -219,18 +215,31 @@ function index_stream(activity) {
     });
 }
 
-/**
- * Given a set of geojson features, and a height/width to project
- * into, get the best geo projection.
- */
-function get_best_projection(width, height, features) {
+return StreamSet;
+})();
+
+StreamSetView = (function() {
+  function StreamSetView(streamset, width, height) {
+    this.streamset = streamset;
+    this.width = width;
+    this.height = height;
+    this.scale_z = streamset.scale_z.copy()
+      .range([100, 200]); // lower number = darker = lower altitude
+    this.projection = get_best_projection(width, height, streamset.features);
+  }
+
+  /**
+   * Given a set of geojson features, and a height/width to project
+   * into, get the best geo projection.
+   */
+  function get_best_projection(width, height, features) {
     //var center = d3.geo.centroid(features);
     var scale = 1;            // strawman
     var offset = [0,0];
 
     var projection = d3.geo.albers()
-            .scale(scale)
-            .translate(offset);
+          .scale(scale)
+          .translate(offset);
 
     var path = d3.geo.path().projection(projection);
     var bounds = path.bounds(features);
@@ -238,13 +247,16 @@ function get_best_projection(width, height, features) {
     // readjust scale and offset, now that we know where 1 and [0,0]
     // takes us.
     scale = .95/Math.max((bounds[1][0] - bounds[0][0]) / width,
-                       (bounds[1][1] - bounds[0][1]) / height);
+                         (bounds[1][1] - bounds[0][1]) / height);
     offset = [(width - scale*(bounds[1][0] + bounds[0][0]))/2,
               (height - scale*(bounds[1][1] + bounds[0][1]))/2];
 
     // now create a new projection
     projection
-        .scale(scale)
-        .translate(offset);
+      .scale(scale)
+      .translate(offset);
     return projection;
-}
+  }
+
+  return StreamSetView;
+})();

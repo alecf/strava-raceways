@@ -81,7 +81,7 @@ def api_handler(f):
                 "messages": [str(e)],
                 "traceback": tb.split('\n')
                 }
-        print "wrapper done"
+        # print "wrapper done"
             
         self.response.write(json.dumps(envelope, indent=4, default=json_default_encode))
         

@@ -106,10 +106,11 @@ RenderContext.prototype.add_activities_to_scene = function(streamset) {
             var altitude = activity.stream.altitude.data[i];
             var proximity = activity.stream.proximity.data[i];
 
-            var xy = streamset.projection([point[1], point[0]]);
+            // need to swap latlng -> lnglat
+            var xy = this.view.projection([point[1], point[0]]);
             var x = xy[0];
             var y = xy[1];
-            var z = streamset.scale_z(altitude);
+            var z = this.view.scale_z(altitude);
 
             geometry.vertices.push(new THREE.Vector3(x, y, z));
 
@@ -170,7 +171,7 @@ RenderContext.prototype.updatescene = function(streamset) {
 
     this.ensureCamera();
     var rect = this.canvas.getBoundingClientRect();
-    streamset.setSize(rect.width, rect.height);
+    this.view = new StreamSetView(streamset, rect.width, rect.height);
 
     var max_z = -1;
     var min_z = -1;
@@ -213,8 +214,6 @@ RenderContext.prototype.updatescene = function(streamset) {
     this.camera.position.set(center.x, max.y*1.5, max.z);
     this.controls.target.set(center.x, center.y, center.z);
     this.camera.lookAt(center.x, center.y, center.z);
-
-    //console.log("Kicking off render with ", this.scene, this.camera);
 };
 
 
@@ -243,19 +242,18 @@ RenderContext2d.prototype.updatemap = function(streamset) {
 
 RenderContext2d.prototype.updatescene = function(streamset) {
     var rect = this.canvas.getBoundingClientRect();
-    console.log("Setting 2d size to ", rect.width, ", ", rect.height, " from ", this.ctx);
-    streamset.setSize(rect.width, rect.height);
+    this.view = new StreamSetView(streamset, rect.width, rect.height);
 
     this.ctx.fillStyle = '#fff';
     this.ctx.fillRect(0, 0, rect.width, rect.height);
 
-    this.draw_background(rect, streamset);
+    this.draw_background();
 
     this.ctx.strokeStyle = 'black';
         this.ctx.stroke();
-    P = streamset.projection;
+    P = this.view.projection;
     A = streamset.activities();
-    var path = d3.geo.path().projection(streamset.projection);
+    var path = d3.geo.path().projection(this.view.projection);
     path.context(this.ctx);
     streamset.activities().forEach(function(activity) {
         this.ctx.beginPath();
@@ -263,20 +261,18 @@ RenderContext2d.prototype.updatescene = function(streamset) {
         path(activity.stream.geojson);
         this.ctx.stroke();
         this.ctx.closePath();
-        console.log("Creating path for ", activity);
         LP = path;
         LA = activity;
     }, this);
-
 };
 
-RenderContext2d.prototype.draw_background = function(rect, streamset) {
+RenderContext2d.prototype.draw_background = function() {
     // make some vornoi!
     var voronoi = d3.geom.voronoi()
-            .clipExtent([[0,0], [rect.width, rect.height]]);
+            .clipExtent([[0,0], [this.view.width, this.view.height]]);
 
-
-    P = streamset.projection;
+    var streamset = this.view.streamset;
+    P = this.view.projection;
     LC = coordinates;
     V = voronoi;
     var coordinates = _(streamset.activities()).pluck('stream')
@@ -288,7 +284,7 @@ RenderContext2d.prototype.draw_background = function(rect, streamset) {
                                 function(a,b) { return a.concat(b); }, []);
 
     // convert to screen space
-    coordinates = coordinates.map(streamset.projection);
+    coordinates = coordinates.map(this.view.projection);
 
     this.ctx.strokeStyle = '#aaa';
     var polygons = voronoi(coordinates);

@@ -102,7 +102,6 @@ class Stream(ndb.Model):
         if not resolution:
             return "{}|v={}|type={}".format(activity_id, cls.version, stream_type)
         else:
-            print "resolution is '{}'".format(resolution)
             return "{}|v={}|type={}|resolution={}".format(
                 activity_id, cls.version, stream_type, resolution)
 
