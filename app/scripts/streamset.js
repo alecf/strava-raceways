@@ -107,17 +107,36 @@ StreamSet.prototype.activities = function() {
 };
 
 StreamSet.prototype.withGeoData = function(callback) {
-    return this.activities_.map(function(activity, i) {
+    return this.activities_.map(function(activity, activity_index) {
         var coordinates = activity.stream.geojson.geometry.coordinates;
-        return coordinates.map(function(coordinates) {
+        return coordinates.map(function(coordinates, coord_index) {
             return callback.call(this,
                                  coordinates[1], // lat
                                  coordinates[0], // lng
                                  coordinates[2], // alt
-                                 i);
+                                 activity_index,
+                                 coord_index);
          });
     });
 };
+
+  /**
+   * A lazy deep dictionary. Pass keys as arguments, and dicts will be
+   * created lazily along the way.
+   */
+  DB = DeepBucket;
+  function DeepBucket(bucket) {
+    // chop off 'bucket'
+    var keys = Array.prototype.slice.call(arguments, 1);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      if (!(key in bucket)) {
+        bucket[key] = {};
+      }
+      bucket = bucket[key];
+    }
+    return bucket;
+  }
 
 // adds a 'proximity' stream to each activity
 // A proximity stream is
@@ -132,31 +151,30 @@ StreamSet.prototype.generate_proximity_streams = function(n) {
     var bucket_z = this.scale_z.copy().rangeRound([0, n]).clamp(true);
 
     var bucketCount = {};
-    function inc(lat, lng, alt, id) {
-        lng = bucket_lng(lng);
-        lat = bucket_lat(lat);
-        var z = bucket_z(alt);
-        if (!(lng in bucketCount))
-            bucketCount[lng] = {};
-        if (!(lat in bucketCount[lng]))
-            bucketCount[lng][lat] = {};
-        if (!(z in bucketCount[lng][lat]))
-            bucketCount[lng][lat][z] = d3.set();
-        bucketCount[lng][lat][z].add(id);
+    function inc(lat, lng, alt, activity_index, coord_index) {
+      var blng = bucket_lng(lng);
+      var blat = bucket_lat(lat);
+      var bz = bucket_z(alt);
+      //var unique_id = activity_index + '_' + coord_index;
+      var bucket = DeepBucket(bucketCount, blng, blat, bz,
+                              activity_index, coord_index);
+      bucket['coord'] = [lng, lat, alt];
     }
     function val(lat, lng, alt) {
         lng = bucket_lng(lng);
         lat = bucket_lat(lat);
         var z = bucket_z(alt);
-        return bucketCount[lng][lat][z].size();
+        return Object.keys(DeepBucket(bucketCount, lng, lat, z)).length;
     }
     // this is kind of a map-reduce style index: count up all
     // lat/lng/altitude combos, then redistribute the counts out to
     // each stream.
 
     // Accumulate counts (map)
-    this.withGeoData(inc);
+  this.withGeoData(inc);
+  this.bucketCount = bucketCount;
 
+  console.log("Used bucket: ", bucketCount);
     // Now summarize (reduce)
     var proximities = this.withGeoData(val);
     console.log("Made proximities: ", proximities);
