@@ -59,7 +59,7 @@ RenderContext.prototype.ensureCamera = function() {
  */
 RenderContext.prototype.onResize = function() {
     //this.renderer.setSize(WIDTH, HEIGHT);
-    console.log("Resizing camera, perspective = ", this.perspective());
+    // console.log("Resizing camera, perspective = ", this.perspective());
     this.camera.aspect = this.perspective();
     this.camera.updateProjectionMatrix();
 };
@@ -231,18 +231,24 @@ RenderContext2d.prototype.onResize = function(event) {
     this.canvas.setAttribute("width", rect.width);
     this.canvas.setAttribute("height", rect.height);
     console.log("Resized to ", rect.width, ", ", rect.height);
+    this.updatescene();
 };
 
 RenderContext2d.prototype.updatemap = function(streamset) {
     streamset.ready().then(function() {
-        this.updatescene(streamset);
+        this.streamset = streamset;
+        this.updatescene();
         this.render_loop();
     }.bind(this)).catch(function(ex) { console.error(ex); });
 };
 
-RenderContext2d.prototype.updatescene = function(streamset) {
+RenderContext2d.prototype.updatescene = function() {
+    // XXX should be waiting for ready
+    if (!this.streamset)
+        return;
+    // this is kinda nasty - it is expensive to create a streamsetview
     var rect = this.canvas.getBoundingClientRect();
-    this.view = new StreamSetView(streamset, rect.width, rect.height);
+    this.view = new StreamSetView(this.streamset, rect.width, rect.height);
 
     this.ctx.fillStyle = '#fff';
     this.ctx.fillRect(0, 0, rect.width, rect.height);
@@ -252,10 +258,10 @@ RenderContext2d.prototype.updatescene = function(streamset) {
     this.ctx.strokeStyle = 'black';
         this.ctx.stroke();
     P = this.view.projection;
-    A = streamset.activities();
+    A = this.streamset.activities();
     var path = d3.geo.path().projection(this.view.projection);
     path.context(this.ctx);
-    streamset.activities().forEach(function(activity) {
+    this.streamset.activities().forEach(function(activity) {
         this.ctx.beginPath();
         // actually write to the context
         path(activity.stream.geojson);
@@ -272,8 +278,8 @@ RenderContext2d.prototype.draw_background = function() {
             .clipExtent([[0,0], [this.view.width, this.view.height]]);
 
     var streamset = this.view.streamset;
+    S = this.view.streamset;
     P = this.view.projection;
-    LC = coordinates;
     V = voronoi;
     var coordinates = _(streamset.activities()).pluck('stream')
             .pluck('geojson')
@@ -282,7 +288,9 @@ RenderContext2d.prototype.draw_background = function() {
             .value();
     coordinates = _.reduceRight(coordinates,
                                 function(a,b) { return a.concat(b); }, []);
-
+    // LC = _(streamset.bucketCount).pluck('stream')
+    //     .pluck('proximity')
+    //     .pluck('data');
     // convert to screen space
     coordinates = coordinates.map(this.view.projection);
 
