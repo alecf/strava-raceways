@@ -10,115 +10,120 @@ function StreamSet(activities, xhrContext, resolution) {
     this.resolution = resolution;
 }
 
-// Get a stream and attach it to the activity. Returns a promise that
-// resolves to a copy of the activity, and a 'stream' property with
-// stream data.
-StreamSet.prototype.load_stream = function(activity) {
+  // Get a stream and attach it to the activity. Returns a promise that
+  // resolves to a copy of the activity, and a 'stream' property with
+  // stream data.
+  StreamSet.prototype.load_stream = function(activity) {
     var activity_id = activity.activity_id;
     if (activity.stream)
-        return Promise.resolve(activity);
+      return Promise.resolve(activity);
     return this.xhr_('/api/streams', {activity_id: activity_id,
                                       resolution: this.resolution })
-        .then(function(streams) {
-            var stream = streams.result.streams[activity_id];
-            var geojson = {
-                    type: 'Feature',
-                    geometry: {
-                        type: 'LineString',
-                        coordinates: stream.latlng.data.map(function(latlng, i) {
-                            // geojson uses lnglat
-                            return [latlng[1], latlng[0],
-                                    stream.altitude.data[i]];
-                        })
-                    }
-                };
-            stream.geojson = geojson;
-            //console.log("Making geojson: ", stream.geojson);
+      .then(function(streams) {
+        var stream = streams.result.streams[activity_id];
+        if (!stream.latlng ||
+            !stream.latlng.data) {
+          console.log("Missing latlng: ", stream.latlng);
+          return activity;
+        }
+        var geojson = {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: stream.latlng.data.map(function(latlng, i) {
+              // geojson uses lnglat
+              return [latlng[1], latlng[0],
+                      stream.altitude.data[i]];
+            })
+          }
+        };
+        stream.geojson = geojson;
+        //console.log("Making geojson: ", stream.geojson);
 
-            activity.stream = stream;
-            return activity;
-        });
-};
+        activity.stream = stream;
+        return activity;
+      });
+  };
 
 
-// Returns a promise that resolves the an array of all activities
-StreamSet.prototype.load_streams = function(activities) {
+  // Returns a promise that resolves the an array of all activities
+  StreamSet.prototype.load_streams = function(activities) {
     var results = [];
     for (var i = 0; i < activities.length; ++i) {
-        results.push(this.load_stream(activities[i]));
+      results.push(this.load_stream(activities[i]));
     }
     return Promise.all(results)
-        .then(function(e) {
-            console.log("Streams loaded (", results.length, ')');
-            return e;
-        });
-};
+      .then(function(e) {
+        console.log("Streams loaded (", results.length, ')');
+        return e;
+      });
+  };
 
 
-StreamSet.prototype.ready = function() {
+  StreamSet.prototype.ready = function() {
     if (!this.ready_) {
-        this.ready_ =
-            this.load_streams(this.activities_)
-            .then(index_streams)
-            .then(this.consume_index.bind(this))
-            .catch(function(ex) {
-                console.error("Error loading and indexing: ", ex);
-            });
+      this.ready_ =
+        this.load_streams(this.activities_)
+        .then(index_streams)
+        .then(this.consume_index.bind(this))
+        .catch(function(ex) {
+          console.error("Error loading and indexing: ", ex);
+        });
     }
     return this.ready_;
-};
+  };
 
-function join_geojsons(geojsons) {
+  function join_geojsons(geojsons) {
     return {
-        type: 'FeatureCollection',
-        features: geojsons,
+      type: 'FeatureCollection',
+      features: geojsons,
     };
-}
+  }
 
-// xxx need a better name
-StreamSet.prototype.consume_index = function(stream_indexes) {
+  // xxx need a better name
+  StreamSet.prototype.consume_index = function(stream_indexes) {
 
     this.features = join_geojsons(stream_indexes.map(function(metadata) {
-        return metadata.geojson;
+      return metadata.geojson;
     }));
 
     var extents = this.extents_ = {
-        min_lat: d3.min(stream_indexes,
-                        function(d) { return d.domain.lat[0]; }),
-        max_lat: d3.max(stream_indexes,
-                        function(d) { return d.domain.lat[1]; }),
-        min_lng: d3.min(stream_indexes,
-                        function(d) { return d.domain.lng[0]; }),
-        max_lng: d3.max(stream_indexes,
-                        function(d) { return d.domain.lng[1]; }),
-        min_alt: d3.min(stream_indexes,
-                        function(d) { return d.domain.alt[0]; }),
-        max_alt: d3.max(stream_indexes,
-                        function(d) { return d.domain.alt[1]; }),
+      min_lat: d3.min(stream_indexes,
+                      function(d) { return d.domain.lat[0]; }),
+      max_lat: d3.max(stream_indexes,
+                      function(d) { return d.domain.lat[1]; }),
+      min_lng: d3.min(stream_indexes,
+                      function(d) { return d.domain.lng[0]; }),
+      max_lng: d3.max(stream_indexes,
+                      function(d) { return d.domain.lng[1]; }),
+      min_alt: d3.min(stream_indexes,
+                      function(d) { return d.domain.alt[0]; }),
+      max_alt: d3.max(stream_indexes,
+                      function(d) { return d.domain.alt[1]; }),
     };
 
     this.scale_z = d3.scale.linear().domain([extents.min_alt,
                                              extents.max_alt]);
-    this.generate_proximity_streams(20);
-};
+    this.generate_proximity_streams(100);
+  };
 
-StreamSet.prototype.activities = function() {
+  StreamSet.prototype.activities = function() {
     return this.activities_;
-};
+  };
 
-StreamSet.prototype.withGeoData = function(callback) {
+  StreamSet.prototype.withGeoData = function(callback) {
     return this.activities_.map(function(activity, activity_index) {
-        var coordinates = activity.stream.geojson.geometry.coordinates;
-        return coordinates.map(function(coordinates, coord_index) {
-            return callback.call(this,
-                                 coordinates[1], // lat
-                                 coordinates[0], // lng
-                                 coordinates[2], // alt
-                                 activity_index,
-                                 coord_index);
-         });
+      var coordinates = activity.stream.geojson.geometry.coordinates;
+      return coordinates.map(function(coordinates, coord_index) {
+        return callback.call(this,
+                             coordinates[1], // lat
+                             coordinates[0], // lng
+                             coordinates[2], // alt
+                             activity_index,
+                             coord_index);
+      });
     });
-};
+  };
 
   /**
    * A lazy deep dictionary. Pass keys as arguments, and dicts will be
@@ -138,16 +143,16 @@ StreamSet.prototype.withGeoData = function(callback) {
     return bucket;
   }
 
-// adds a 'proximity' stream to each activity
-// A proximity stream is
-StreamSet.prototype.generate_proximity_streams = function(n) {
+  // adds a 'proximity' stream to each activity
+  // A proximity stream is
+  StreamSet.prototype.generate_proximity_streams = function(n) {
     // first index the 3d space
     var bucket_lng = d3.scale.linear().domain([this.extents_.min_lng,
                                                this.extents_.max_lng])
-            .rangeRound([0,n]).clamp(true);
+          .rangeRound([0,n]).clamp(true);
     var bucket_lat = d3.scale.linear().domain([this.extents_.min_lng,
                                                this.extents_.max_lng])
-            .rangeRound([0,n]).clamp(true);
+          .rangeRound([0,n]).clamp(true);
     var bucket_z = this.scale_z.copy().rangeRound([0, n]).clamp(true);
 
     var bucketCount = {};
@@ -161,28 +166,28 @@ StreamSet.prototype.generate_proximity_streams = function(n) {
       bucket['coord'] = [lng, lat, alt];
     }
     function val(lat, lng, alt) {
-        lng = bucket_lng(lng);
-        lat = bucket_lat(lat);
-        var z = bucket_z(alt);
-        return Object.keys(DeepBucket(bucketCount, lng, lat, z)).length;
+      lng = bucket_lng(lng);
+      lat = bucket_lat(lat);
+      var z = bucket_z(alt);
+      return Object.keys(DeepBucket(bucketCount, lng, lat, z)).length;
     }
     // this is kind of a map-reduce style index: count up all
     // lat/lng/altitude combos, then redistribute the counts out to
     // each stream.
 
     // Accumulate counts (map)
-  this.withGeoData(inc);
-  this.bucketCount = bucketCount;
+    this.withGeoData(inc);
+    this.bucketCount = bucketCount;
 
-  console.log("Used bucket: ", bucketCount);
+    console.log("Used bucket: ", bucketCount);
     // Now summarize (reduce)
     var proximities = this.withGeoData(val);
     console.log("Made proximities: ", proximities);
     // now reintegrate them into the existing activities
     _.zip(this.activities_, proximities).forEach(function(actprox) {
-        var activity = actprox[0];
-        var proximity = actprox[1];
-        activity.stream.proximity = { data: proximity };
+      var activity = actprox[0];
+      var proximity = actprox[1];
+      activity.stream.proximity = { data: proximity };
     });
 
 
@@ -193,47 +198,43 @@ StreamSet.prototype.generate_proximity_streams = function(n) {
     // be value in colorizing the space? i.e. visualizing a cloud in
     // each bucket
     this.bucketCount_ = bucketCount;
-};
+  };
 
-function accessor(attr) {
+  function accessor(attr) {
     return function(d, i) {
-        return d[attr];
+      return d[attr];
     };
-}
+  }
 
-// generate metadata about all the streams
-function index_streams(activities) {
-    var results = [];
-    for (var i = 0; i < activities.length; ++i) {
-        results.push(index_stream(activities[i]));
-    }
-    return Promise.all(results);
-}
+  // generate metadata about all the streams
+  function index_streams(activities) {
+    return Promise.all(activities.map(index_stream));
+  }
 
-// generate metadata about a single stream. Returns a promise of the data
-function index_stream(activity) {
+  // generate metadata about a single stream. Returns a promise of the data
+  function index_stream(activity) {
     var stream = activity.stream;
     if (!stream) {
-        return Promise.reject(["Missing stream in ", activity]);
+      return Promise.reject(["Missing stream in ", activity]);
     }
     return new Promise(function(resolve, reject) {
-        var metadata = {domain: {}};
+      var metadata = {domain: {}};
 
-        metadata.geojson = stream.geojson;
-        var latlng_stream = stream.latlng;
-        var alt_stream = stream.altitude;
-        if (latlng_stream && latlng_stream.data) {
-            metadata.domain.lat = d3.extent(latlng_stream.data, accessor(0));
-            metadata.domain.lng = d3.extent(latlng_stream.data, accessor(1));
-        }
-        if (alt_stream && alt_stream.data) {
-            metadata.domain.alt = d3.extent(alt_stream.data);
-        }
-        resolve(metadata);
+      metadata.geojson = stream.geojson;
+      var latlng_stream = stream.latlng;
+      var alt_stream = stream.altitude;
+      if (latlng_stream && latlng_stream.data) {
+        metadata.domain.lat = d3.extent(latlng_stream.data, accessor(0));
+        metadata.domain.lng = d3.extent(latlng_stream.data, accessor(1));
+      }
+      if (alt_stream && alt_stream.data) {
+        metadata.domain.alt = d3.extent(alt_stream.data);
+      }
+      resolve(metadata);
     });
-}
+  }
 
-return StreamSet;
+  return StreamSet;
 })();
 
 StreamSetView = (function() {
