@@ -133,9 +133,9 @@ Profile.prototype.refresh = function() {
     console.log("Refreshing...");
     return this.dataset.activities()
         .then(function(activities) {
-            this.bounds = new StreamSet(activities, this.xhr_, this.resolution);
-            this.context.updatemap(this.bounds);
-            this.context2d.updatemap(this.bounds);
+            this.streamset = new StreamSet(activities, this.xhr_, this.resolution);
+            this.context.updatemap(this.streamset);
+            this.context2d.updatemap(this.streamset);
             this.totalActivities = activities.length;
         }.bind(this))
         .catch(function(ex) { console.error(ex); });
