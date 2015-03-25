@@ -272,88 +272,6 @@ RenderContext2d.prototype.updatescene = function() {
     }, this);
 };
 
-// Given a sparse array constructed with objects, flatten out all the
-// levels, given array values along the way, returning a list of pairs
-// where the first coordinate is the indexes in the sparse array, and
-// the value is the value at that entry.
-//
-// For example, it transforms this:
-//
-// { 1:
-//   { 2:
-//     { 3: "onetwothree",
-//       4: "onetwofour",
-//     },
-//     8: {
-//         9: "oneeightnine",
-//     }
-//   }
-// }
-//
-// Into this:
-// [
-//   [[1,2,3], "onetwothree"]
-//   [[1,2,4], "onetwofour"]
-//   [[1,8,9], "oneeightnine"]
-// ]
-function ExtractSparseArray(obj, depth) {
-    if (depth == 1) {
-        return _.pairs(obj).map(function(pair) {
-            // we have to return the first element as an array to let
-            // concatentation of pair[0] (below) work.
-            return [[pair[0]], pair[1]];
-        });
-    }
-    var result = [];
-    _.pairs(obj).forEach(function(pairs) {
-        // we have to start the key as an array so it can be concatenated.
-        var key = [pairs[0]];
-        ExtractSparseArray(pairs[1], depth-1).forEach(function(pairs) {
-            result.push([key.concat(pairs[0]),
-                         pairs[1]]);
-        });
-    });
-    return result;
-}
-
-// This is super-cheezy. just average all the
-function AverageCoordinates(coordinates) {
-    var avglng = d3.mean(_.pluck(coordinates, 0));
-    var avglat = d3.mean(_.pluck(coordinates, 1));
-    return [avglng, avglat];
-}
-
-RenderContext2d.prototype.allCoordinates = function() {
-    var streamset = this.view.streamset;
-    var coordinates = _(streamset.activities()).pluck('stream')
-            .pluck('geojson')
-            .pluck('geometry')
-            .pluck('coordinates')
-            .value();
-    coordinates = _.reduceRight(coordinates,
-                                function(a,b) { return a.concat(b); }, []);
-
-    return coordinates.map(this.view.projection);
-};
-
-RenderContext2d.prototype.allBucketCoordinates = function() {
-    var buckets_by_bucketindex =
-            ExtractSparseArray(this.view.streamset.bucketCount, 3);
-    var bucket_averages = buckets_by_bucketindex.map(function(pair) {
-        var bucketInfo = pair[1];
-        var coordinates = _(bucketInfo)
-                .map(_.values)
-                .flatten(true)
-                .pluck('coord')
-                .value();
-        return AverageCoordinates(coordinates);
-    });
-
-    var bucket_coordinates = bucket_averages.map(this.view.projection);
-
-    return bucket_coordinates;
-};
-
 /**
  * Use voronoi to draw spaces around each coordinates.
  */
@@ -367,8 +285,8 @@ RenderContext2d.prototype.draw_background = function() {
 
     // convert to screen space
     this.ctx.strokeStyle = '#aaa';
-    //var polygons = voronoi(this.allCoordinates());
-    var polygons = voronoi(this.allBucketCoordinates());
+    //var polygons = voronoi(this.view.allCoordinates());
+    var polygons = voronoi(this.view.allBucketCoordinates());
     polygons.forEach(function(polygon) {
         this.ctx.beginPath();
         this.ctx.moveTo(polygon[0][0], polygon[0][1]);

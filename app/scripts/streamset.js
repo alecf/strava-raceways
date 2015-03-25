@@ -234,6 +234,85 @@ function StreamSet(activities, xhrContext, resolution) {
     });
   }
 
+  function CoordinatesCenter(coordinates) {
+    return d3.geo.centroid({
+      type: 'MultiPoint',
+      coordinates: coordinates});
+  }
+
+  // Given a sparse array constructed with objects, flatten out all the
+  // levels, given array values along the way, returning a list of pairs
+  // where the first coordinate is the indexes in the sparse array, and
+  // the value is the value at that entry.
+  //
+  // For example, it transforms this:
+  //
+  // { 1:
+  //   { 2:
+  //     { 3: "onetwothree",
+  //       4: "onetwofour",
+  //     },
+  //     8: {
+  //         9: "oneeightnine",
+  //     }
+  //   }
+  // }
+  //
+  // Into this:
+  // [
+  //   [[1,2,3], "onetwothree"]
+  //   [[1,2,4], "onetwofour"]
+  //   [[1,8,9], "oneeightnine"]
+  // ]
+  function ExtractSparseArray(obj, depth) {
+    if (depth == 1) {
+      return _.pairs(obj).map(function(pair) {
+        // we have to return the first element as an array to let
+        // concatentation of pair[0] (below) work.
+        return [[pair[0]], pair[1]];
+      });
+    }
+    var result = [];
+    _.pairs(obj).forEach(function(pairs) {
+      // we have to start the key as an array so it can be concatenated.
+      var key = [pairs[0]];
+      ExtractSparseArray(pairs[1], depth-1).forEach(function(pairs) {
+        result.push([key.concat(pairs[0]),
+                     pairs[1]]);
+      });
+    });
+    return result;
+  }
+
+  StreamSet.prototype.allCoordinates = function() {
+    var coordinates = _(this.activities()).pluck('stream')
+          .pluck('geojson')
+          .pluck('geometry')
+          .pluck('coordinates')
+            .value();
+    coordinates = _.reduceRight(coordinates,
+                                function(a,b) { return a.concat(b); }, []);
+
+    return coordinates;
+  };
+
+  StreamSet.prototype.allBucketCoordinates = function() {
+    var buckets_by_bucketindex = ExtractSparseArray(this.bucketCount, 3);
+    var bucket_averages = buckets_by_bucketindex.map(function(pair) {
+      var bucketInfo = pair[1];
+      var coordinates = _(bucketInfo)
+            .map(_.values)
+            .flatten(true)
+            .pluck('coord')
+            .value();
+        return CoordinatesCenter(coordinates);
+    });
+
+    return bucket_averages;
+};
+
+
+
   return StreamSet;
 })();
 
@@ -276,6 +355,14 @@ StreamSetView = (function() {
       .translate(offset);
     return projection;
   }
+
+  StreamSetView.prototype.allCoordinates = function() {
+    return this.streamset.allCoordinates().map(this.projection);
+  };
+
+  StreamSetView.prototype.allBucketCoordinates = function() {
+    return this.streamset.allBucketCoordinates().map(this.projection);
+  };
 
   return StreamSetView;
 })();
