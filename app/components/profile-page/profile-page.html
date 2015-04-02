@@ -7,6 +7,7 @@
 <link rel="import" href="../../bower_components/core-item/core-item.html">
 <link rel="import" href="../../bower_components/core-menu/core-menu.html">
 <link rel="import" href="../../bower_components/core-scaffold/core-scaffold.html">
+<link rel="import" href="../../bower_components/core-splitter/core-splitter.html">
 <link rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../../bower_components/paper-progress/paper-progress.html">
 <link rel="import" href="../facet-list/facet-list.html">
@@ -44,8 +45,9 @@
           </paper-icon-button>
           
           <div layout vertical fit>
-              <canvas id="canvas3d" width="800" height="400" flex five></canvas>
-              <canvas id="canvas2d" width="800" height="194" flex one></canvas>
+              <canvas id="canvas3d" width="800" height="400" flex></canvas>
+              <core-splitter direction="down"></core-splitter>
+              <canvas id="canvas2d" width="800" height="194"></canvas>
           </div>
       </core-scaffold>
       <core-ajax id="refreshAjax" url="/api/update?count=30"

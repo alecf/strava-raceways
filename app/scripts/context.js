@@ -66,6 +66,7 @@ RenderContext.prototype.onResize = function() {
 
     this.camera.aspect = this.perspective();
     this.camera.updateProjectionMatrix();
+    this.onControlsChange();
 };
 
 /**
