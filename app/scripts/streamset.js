@@ -4,7 +4,14 @@
 // requires d3.js and lodash
 StreamSet = (function() {
 
-function StreamSet(activities, xhrContext, resolution) {
+/**
+ * Create a new streamset
+ *
+ * @param activities A list of metadata about activities.
+ * @param xhrContext Context for making further XHR calls.
+ * @param resolution 'high' / 'medium' / 'low'
+ */
+function StreamSet(activities, xhrContext, resolution, proximity_sample) {
     this.xhr_ = xhrContext;
     this.activities_ = activities;
     this.resolution = resolution;
@@ -38,8 +45,6 @@ function StreamSet(activities, xhrContext, resolution) {
           }
         };
         stream.geojson = geojson;
-        //console.log("Making geojson: ", stream.geojson);
-
         activity.stream = stream;
         return activity;
       });
@@ -104,7 +109,7 @@ function StreamSet(activities, xhrContext, resolution) {
 
     this.scale_z = d3.scale.linear().domain([extents.min_alt,
                                              extents.max_alt]);
-    this.generate_proximity_streams(100);
+    this.generate_proximity_streams(40);
   };
 
   StreamSet.prototype.activities = function() {
@@ -128,6 +133,12 @@ function StreamSet(activities, xhrContext, resolution) {
   /**
    * A lazy deep dictionary. Pass keys as arguments, and dicts will be
    * created lazily along the way.
+   *
+   * Usage:
+   * DeepBucket(bucket, x1,y1,z1).foo = 'bar';
+   * DeepBucket(bucket, x2,y2,z2).name = 'baz'
+   *
+   * Now bucket[x1][y1][z1].foo == 'bar'
    */
   DB = DeepBucket;
   function DeepBucket(bucket) {
@@ -150,20 +161,28 @@ function StreamSet(activities, xhrContext, resolution) {
     var bucket_lng = d3.scale.linear().domain([this.extents_.min_lng,
                                                this.extents_.max_lng])
           .rangeRound([0,n]).clamp(true);
-    var bucket_lat = d3.scale.linear().domain([this.extents_.min_lng,
-                                               this.extents_.max_lng])
+    var bucket_lat = d3.scale.linear().domain([this.extents_.min_lat,
+                                               this.extents_.max_lat])
           .rangeRound([0,n]).clamp(true);
     var bucket_z = this.scale_z.copy().rangeRound([0, n]).clamp(true);
+
+    this.bucket_lng = bucket_lng;
+    this.bucket_lat = bucket_lat;
+    this.bucket_z = bucket_z;
+
+    // Build up a bucket that effectively maps
+    // [lng, lat, z] -> [[activity_index1, [point_index1_1, point_index_1_2,..],
+    //                   [activity_index2, [point_index2_1, point_index_2_2,..],
+    //                   ...]
 
     var bucketCount = {};
     function inc(lat, lng, alt, activity_index, coord_index) {
       var blng = bucket_lng(lng);
       var blat = bucket_lat(lat);
       var bz = bucket_z(alt);
-      //var unique_id = activity_index + '_' + coord_index;
       var bucket = DeepBucket(bucketCount, blng, blat, bz,
                               activity_index, coord_index);
-      bucket['coord'] = [lng, lat, alt];
+      bucket.coord = [lng, lat, alt];
     }
     function val(lat, lng, alt) {
       lng = bucket_lng(lng);
@@ -179,10 +198,8 @@ function StreamSet(activities, xhrContext, resolution) {
     this.withGeoData(inc);
     this.bucketCount = bucketCount;
 
-    console.log("Used bucket: ", bucketCount);
     // Now summarize (reduce)
     var proximities = this.withGeoData(val);
-    console.log("Made proximities: ", proximities);
     // now reintegrate them into the existing activities
     _.zip(this.activities_, proximities).forEach(function(actprox) {
       var activity = actprox[0];
@@ -284,32 +301,114 @@ function StreamSet(activities, xhrContext, resolution) {
     return result;
   }
 
+  // Center of all points in the bucket. Note that this is leaving out
+  // altitude!
+  function BucketCenter(bucketInfo) {
+      var coordinates = _(bucketInfo)
+            .map(_.values)
+            .flatten(true)
+            .pluck('coord')
+            .value();
+    return CoordinatesCenter(coordinates);
+  }
+
   StreamSet.prototype.allCoordinates = function() {
     var coordinates = _(this.activities()).pluck('stream')
           .pluck('geojson')
           .pluck('geometry')
           .pluck('coordinates')
-            .value();
+          .value();
     coordinates = _.reduceRight(coordinates,
                                 function(a,b) { return a.concat(b); }, []);
 
     return coordinates;
   };
 
+  /**
+   * Gets the centroid of each bucket that have paths through it.
+   */
   StreamSet.prototype.allBucketCoordinates = function() {
     var buckets_by_bucketindex = ExtractSparseArray(this.bucketCount, 3);
-    var bucket_averages = buckets_by_bucketindex.map(function(pair) {
-      var bucketInfo = pair[1];
-      var coordinates = _(bucketInfo)
-            .map(_.values)
-            .flatten(true)
-            .pluck('coord')
-            .value();
-        return CoordinatesCenter(coordinates);
-    });
+    var bucket_averages = _(buckets_by_bucketindex)
+          .map(function(pair) {
+            var bucketInfo = pair[1];
+            return BucketCenter(bucketInfo);
+          })
+          .unique(false, function(center) {
+            return center.join('\n');
+          })
+          .value();
 
     return bucket_averages;
-};
+  };
+
+  /**
+   * Get a simplified set of streams, from bucket center to bucket
+   * center.
+   */
+  StreamSet.prototype.allBucketStreams = function() {
+    // This will be a map from activity_index to the array of buckets.
+    var buckets_by_bucketindex = ExtractSparseArray(this.bucketCount, 3);
+
+    var activity_coords = {};
+    // extract a list of activity_indexes
+    _(buckets_by_bucketindex)
+      // extract bucket
+      .map(function(pair) {
+        return pair[1];
+      })
+      // extract activity_indexes
+      .map(function(bucket) {
+        return Object.keys(bucket);
+      })
+      // uniquify across all buckets
+      .flatten()
+      .unique()
+
+      // Now initialize
+      .forEach(function(activity_index) {
+        activity_coords[activity_index] = [];
+      })
+      .value();
+
+    // now reconstruct streams from buckets
+    buckets_by_bucketindex
+      .forEach(function(pair) {
+        var bucketInfo = pair[1];
+        var bucket_center = BucketCenter(bucketInfo);
+        _(bucketInfo).forEach(function(points, activity_index) {
+          // the sort is the challenge here. We're pushing them in
+          // bucket order. So instead, we'll put the activity's stream
+          // order into the array, and sort it it later.
+          _(points).keys().forEach(function(stream_entry_index) {
+            activity_coords[activity_index].push(
+              [parseInt(stream_entry_index), bucket_center]);
+          }).value();
+        }).value();
+      });
+
+    var bucket_streams = _(activity_coords)
+          .pairs()
+          .map(function(activity_streams) {
+            var activity_index = activity_streams[0];
+            var points = activity_streams[1];
+            points.sort(function(a, b) {
+              return a[0] - b[0];
+            });
+            var unique = _(points)
+                  .map(function(streampoint) {
+                    return streampoint[1];
+                  })
+                  .unique(true, function(point) {
+                    return point.join('\n');
+                  })
+                  .value();
+            return unique;
+          })
+          .value();
+
+    return bucket_streams;
+  };
 
 
 
@@ -362,6 +461,12 @@ StreamSetView = (function() {
 
   StreamSetView.prototype.allBucketCoordinates = function() {
     return this.streamset.allBucketCoordinates().map(this.projection);
+  };
+
+  StreamSetView.prototype.allBucketStreams = function() {
+    return this.streamset.allBucketStreams().map(function(stream) {
+      return stream.map(this.projection);
+    }, this);
   };
 
   return StreamSetView;

@@ -12,7 +12,7 @@
 <link rel="import" href="../facet-list/facet-list.html">
 <link rel="import" href="../facet-selector/facet-selector.html">
 
-<script src="/bower_components/d3/d3.min.js" ></script>
+<script src="/bower_components/d3/d3.js" ></script>
 <script src="/bower_components/colorbrewer/colorbrewer.js" ></script>
 <script src="/bower_components/lodash/lodash.min.js" ></script>
 <script src="/scripts/xhr.js" defer></script>
@@ -44,8 +44,8 @@
           </paper-icon-button>
           
           <div layout vertical fit>
-              <canvas id="canvas3d" width="800" height="400" flex two></canvas>
-              <canvas id="canvas2d" width="800" height="194" flex five></canvas>
+              <canvas id="canvas3d" width="800" height="400" flex five></canvas>
+              <canvas id="canvas2d" width="800" height="194" flex one></canvas>
           </div>
       </core-scaffold>
       <core-ajax id="refreshAjax" url="/api/update?count=30"

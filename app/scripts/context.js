@@ -35,18 +35,17 @@ RenderContext.prototype.updatemap = function(streamset) {
 };
 
 RenderContext.prototype.perspective = function() {
-    var rect = this.canvas.getBoundingClientRect();
-    return rect.width/rect.height;
+    return this.rect.width/this.rect.height;
 };
 
 RenderContext.prototype.ensureCamera = function() {
-    console.log("Ensuring camera, perspective = ", this.perspective());
     if (!this.camera) {
         this.camera =
             new THREE.PerspectiveCamera( 75,
-                                         this.perspective(), 0.1, 1000 );
+                                         1, 0.1, 1000 );
         // Create an event listener that resizes the renderer with the browser window.
         window.addEventListener('resize', this.onResize.bind(this));
+        this.onResize();
 
         this.camera.up.set(0,0,1);
         this.controls = new THREE.OrbitControls(this.camera, this.canvas);
@@ -60,6 +59,11 @@ RenderContext.prototype.ensureCamera = function() {
 RenderContext.prototype.onResize = function() {
     //this.renderer.setSize(WIDTH, HEIGHT);
     // console.log("Resizing camera, perspective = ", this.perspective());
+    this.rect = this.canvas.getBoundingClientRect();
+    if (this.streamset) {
+        this.view = new StreamSetView(this.streamset, this.rect.width, this.rect.height);
+    }
+
     this.camera.aspect = this.perspective();
     this.camera.updateProjectionMatrix();
 };
@@ -170,8 +174,7 @@ RenderContext.prototype.add_light = function() {
 RenderContext.prototype.updatescene = function(streamset) {
 
     this.ensureCamera();
-    var rect = this.canvas.getBoundingClientRect();
-    this.view = new StreamSetView(streamset, rect.width, rect.height);
+    this.view = new StreamSetView(streamset, this.rect.width, this.rect.height);
 
     var max_z = -1;
     var min_z = -1;
@@ -220,7 +223,6 @@ RenderContext.prototype.updatescene = function(streamset) {
 function RenderContext2d(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    console.log("Got context ", this.ctx, " from ", canvas);
     this.pending_render = false;
     window.addEventListener('resize', this.onResize.bind(this));
     this.onResize();
@@ -249,33 +251,72 @@ RenderContext2d.prototype.updatescene = function() {
     // this is kinda nasty - it is expensive to create a streamsetview
     var rect = this.canvas.getBoundingClientRect();
     this.view = new StreamSetView(this.streamset, rect.width, rect.height);
+    SS = this.streamset;
+    SV = this.view;
 
     this.ctx.fillStyle = '#fff';
     this.ctx.fillRect(0, 0, rect.width, rect.height);
 
+    //this.draw_gridlines();
     this.draw_background();
 
+    //this.draw_activities();
+
+    this.draw_simplified_activities();
+};
+
+RenderContext2d.prototype.draw_activities = function() {
+    this.ctx.save();
     this.ctx.strokeStyle = 'black';
-        this.ctx.stroke();
-    P = this.view.projection;
-    A = this.streamset.activities();
+    this.ctx.lineWidth = 1;
     var path = d3.geo.path().projection(this.view.projection);
     path.context(this.ctx);
     this.streamset.activities().forEach(function(activity) {
         this.ctx.beginPath();
         // actually write to the context
         path(activity.stream.geojson);
-        this.ctx.stroke();
         this.ctx.closePath();
-        LP = path;
-        LA = activity;
+        this.ctx.stroke();
     }, this);
+    this.ctx.restore();
+};
+
+RenderContext2d.prototype.draw_simplified_activities = function() {
+    this.ctx.save();
+    var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
+    var path = d3.geo.path().projection(this.view.projection);
+    path.context(this.ctx);
+    this.streamset.allBucketStreams().forEach(function(stream, index) {
+        // hack
+        var stream_geojson = {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+              coordinates: stream,
+          }
+        };
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeStyle = '#eee';
+        this.ctx.beginPath();
+        path(stream_geojson);
+        this.ctx.closePath();
+        this.ctx.stroke();
+
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = color(index);
+        this.ctx.beginPath();
+        path(stream_geojson);
+        this.ctx.closePath();
+        this.ctx.stroke();
+    }, this);
+    this.ctx.restore();
 };
 
 /**
  * Use voronoi to draw spaces around each coordinates.
  */
 RenderContext2d.prototype.draw_background = function() {
+    this.ctx.save();
     // make some vornoi!
     var voronoi = d3.geom.voronoi()
             .clipExtent([[0,0], [this.view.width, this.view.height]]);
@@ -283,11 +324,24 @@ RenderContext2d.prototype.draw_background = function() {
     // var buckets_by_bucketindex =
     //         ExtractProximityData(streamset.bucketCount);
 
+    this.ctx.lineWidth = 1;
     // convert to screen space
-    this.ctx.strokeStyle = '#aaa';
-    //var polygons = voronoi(this.view.allCoordinates());
-    var polygons = voronoi(this.view.allBucketCoordinates());
-    polygons.forEach(function(polygon) {
+    //var coordinates = this.view.allCoordinates();
+    var coordinates = this.view.allBucketCoordinates();
+    var triangles = voronoi.triangles(coordinates);
+    // this.ctx.strokeStyle = '#eee';
+    // triangles.forEach(function(triangle) {
+    //     this.ctx.beginPath();
+    //     this.ctx.moveTo(triangle[0][0], triangle[0][1]);
+    //     triangle.forEach(function(point) {
+    //         this.ctx.lineTo(point[0], point[1]);
+    //     }, this);
+    //     this.ctx.closePath();
+    //     this.ctx.stroke();
+    // }, this);
+    var polygons = voronoi(coordinates);
+    this.ctx.strokeStyle = '#bbb';
+    polygons.forEach(function(polygon, i) {
         this.ctx.beginPath();
         this.ctx.moveTo(polygon[0][0], polygon[0][1]);
         polygon.forEach(function(point) {
@@ -297,6 +351,41 @@ RenderContext2d.prototype.draw_background = function() {
         this.ctx.stroke();
     }, this);
 
+    this.ctx.restore();
+    console.log("Got ", polygons.length, " polygons and ", triangles.length, " triangles from ", coordinates.length);
+};
+
+RenderContext2d.prototype.draw_gridlines = function() {
+    this.ctx.save();
+    this.ctx.lineWidth = 0.5;
+    this.ctx.strokeStyle = '#eee';
+    var lat_range = this.streamset.bucket_lat.range();
+    var lng_range = this.streamset.bucket_lng.range();
+    var lng_start = this.streamset.bucket_lng.invert(lng_range[0]);
+    var lng_end = this.streamset.bucket_lng.invert(lng_range[1]);
+    var lat_start = this.streamset.bucket_lat.invert(lat_range[0]);
+    var lat_end = this.streamset.bucket_lat.invert(lat_range[1]);
+    var p;
+    for (var i = lat_range[0]; i < lat_range[1]; i+=4) {
+        var lat = this.streamset.bucket_lat.invert(i);
+
+
+        p = this.view.projection([lng_start, lat]);
+        this.ctx.moveTo(p[0], p[1]);
+        p = this.view.projection([lng_end, lat]);
+        this.ctx.lineTo(p[0], p[1]);
+        this.ctx.stroke();
+    }
+    for (var j = lng_range[0]; j < lng_range[1]; j+=4) {
+        var lng = this.streamset.bucket_lng.invert(j);
+        var p;
+        p = this.view.projection([lng, lat_start]);
+        this.ctx.moveTo(p[0], p[1]);
+        p = this.view.projection([lng, lat_end]);
+            this.ctx.lineTo(p[0], p[1]);
+        this.ctx.stroke();
+    }
+    this.ctx.restore();
 };
 
 
