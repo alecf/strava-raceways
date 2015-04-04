@@ -106,7 +106,9 @@ Profile.prototype.update_progress_indicator = function(waiting, complete) {
 };
 
 Profile.prototype.init = function() {
-    this.context = new RenderContext(this.profilePage.$.canvas3d);
+    if (this.profilePage.$.canvas3d) {
+        this.context = new RenderContext(this.profilePage.$.canvas3d);
+    }
     this.context2d = new RenderContext2d(this.profilePage.$.canvas2d);
 
     this.xhr_ = XHRContext(this.update_progress_indicator.bind(this));
@@ -126,6 +128,13 @@ Profile.prototype.init = function() {
     this.refresh();
 };
 
+Profile.prototype.onResize = function() {
+    if (this.context) {
+        this.context.onResize();
+    }
+    this.context2d.onResize();
+};
+
 /**
  *
  */
@@ -134,7 +143,9 @@ Profile.prototype.refresh = function() {
     return this.dataset.activities()
         .then(function(activities) {
             this.streamset = new StreamSet(activities, this.xhr_, this.resolution);
-            this.context.updatemap(this.streamset);
+            if (this.context) {
+                this.context.updatemap(this.streamset);
+            }
             this.context2d.updatemap(this.streamset);
             this.totalActivities = activities.length;
         }.bind(this))

@@ -40,6 +40,7 @@ RenderContext.prototype.perspective = function() {
 
 RenderContext.prototype.ensureCamera = function() {
     if (!this.camera) {
+        // start with a perspective of 1, and then
         this.camera =
             new THREE.PerspectiveCamera( 75,
                                          1, 0.1, 1000 );
@@ -57,8 +58,6 @@ RenderContext.prototype.ensureCamera = function() {
  * Called when the user resizes the window
  */
 RenderContext.prototype.onResize = function() {
-    //this.renderer.setSize(WIDTH, HEIGHT);
-    // console.log("Resizing camera, perspective = ", this.perspective());
     this.rect = this.canvas.getBoundingClientRect();
     if (this.streamset) {
         this.view = new StreamSetView(this.streamset, this.rect.width, this.rect.height);
@@ -360,7 +359,7 @@ RenderContext2d.prototype.draw_gridlines = function() {
     this.ctx.save();
     this.ctx.lineWidth = 0.5;
     this.ctx.strokeStyle = '#eee';
-    var lat_range = this.streamset.bucket_lat.range();
+    var lpat_range = this.streamset.bucket_lat.range();
     var lng_range = this.streamset.bucket_lng.range();
     var lng_start = this.streamset.bucket_lng.invert(lng_range[0]);
     var lng_end = this.streamset.bucket_lng.invert(lng_range[1]);

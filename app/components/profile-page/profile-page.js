@@ -19,7 +19,6 @@ Polymer('profile-page', {
         this.resolution = params.resolution || this.resolution;
         this.profile = new Profile(this, this.resolution);
         this.profile.init();
-
     },
     onRefresh: function() {
         if (this.$.refreshAjax.loading) return;
@@ -35,5 +34,15 @@ Polymer('profile-page', {
     onDataLoaded: function() {
         this.$['refresh-button'].icon = 'refresh';
         this.profile.refresh();
+    },
+    onSplitterMove: function(e) {
+        this.job('splitter-resize', function() {
+            console.log("splitter moved", e);
+            this.profile.onResize();
+        }, 200);
+    },
+
+    on2dScroll: function(e) {
+        console.log("2d scrolling");
     },
 });

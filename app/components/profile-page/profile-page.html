@@ -10,6 +10,7 @@
 <link rel="import" href="../../bower_components/core-splitter/core-splitter.html">
 <link rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../../bower_components/paper-progress/paper-progress.html">
+<link rel="import" href="../path-map-3d/path-map-3d.html">
 <link rel="import" href="../facet-list/facet-list.html">
 <link rel="import" href="../facet-selector/facet-selector.html">
 
@@ -46,8 +47,8 @@
           
           <div layout vertical fit>
               <canvas id="canvas3d" width="800" height="400" flex></canvas>
-              <core-splitter direction="down"></core-splitter>
-              <canvas id="canvas2d" width="800" height="194"></canvas>
+              <core-splitter on-core-resize="{{onSplitterMove}}" direction="down"></core-splitter>
+              <canvas id="canvas2d" width="800" height="194" on-scroll="{{on2dScroll}}"></canvas>
           </div>
       </core-scaffold>
       <core-ajax id="refreshAjax" url="/api/update?count=30"
