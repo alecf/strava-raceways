@@ -251,10 +251,17 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
     });
   }
 
+    var bucketlog = 3;
   function CoordinatesCenter(coordinates) {
-    return d3.geo.centroid({
-      type: 'MultiPoint',
-      coordinates: coordinates});
+      var latlng_center = d3.geo.centroid({
+          type: 'MultiPoint',
+          coordinates: coordinates});
+      var average_altitude = d3.sum(_.pluck(coordinates, 2)) / coordinates.length;
+      var result = [latlng_center[0], latlng_center[1], average_altitude];
+      if (bucketlog-- > 0) {
+          console.log("BucketCenter of ", coordinates, " is ", result);
+      }
+      return result;
   }
 
   // Given a sparse array constructed with objects, flatten out all the
@@ -303,7 +310,7 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
 
   // Center of all points in the bucket. Note that this is leaving out
   // altitude!
-  function BucketCenter(bucketInfo) {
+    function BucketCenter(bucketInfo) {
       var coordinates = _(bucketInfo)
             .map(_.values)
             .flatten(true)
@@ -421,7 +428,7 @@ StreamSetView = (function() {
     this.width = width;
     this.height = height;
     this.scale_z = streamset.scale_z.copy()
-      .range([100, 200]); // lower number = darker = lower altitude
+      .range([100, 500]); // lower number = darker = lower altitude
     this.projection = get_best_projection(width, height, streamset.features);
   }
 
@@ -459,14 +466,16 @@ StreamSetView = (function() {
     return this.streamset.allCoordinates().map(this.projection);
   };
 
-  StreamSetView.prototype.allBucketCoordinates = function() {
-    return this.streamset.allBucketCoordinates().map(this.projection);
-  };
+    StreamSetView.prototype.allBucketCoordinates = function() {
+        var bucketCoordinates = this.streamset.allBucketCoordinates();
+        console.log("allBucketCoordinates got ", bucketCoordinates);
+        return bucketCoordinates.map(this.projection);
+    };
 
   StreamSetView.prototype.allBucketStreams = function() {
-    return this.streamset.allBucketStreams().map(function(stream) {
-      return stream.map(this.projection);
-    }, this);
+      return this.streamset.allBucketStreams().map(function(stream) {
+          return stream.map(this.projection);
+      }, this);
   };
 
   return StreamSetView;

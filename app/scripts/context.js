@@ -34,16 +34,12 @@ RenderContext.prototype.updatemap = function(streamset) {
     }.bind(this)).catch(function(ex) { console.error(ex); });
 };
 
-RenderContext.prototype.perspective = function() {
-    return this.rect.width/this.rect.height;
-};
-
 RenderContext.prototype.ensureCamera = function() {
     if (!this.camera) {
         // start with a perspective of 1, and then
         this.camera =
             new THREE.PerspectiveCamera( 75,
-                                         1, 0.1, 1000 );
+                                         1, 0.1, 3000 );
         // Create an event listener that resizes the renderer with the browser window.
         window.addEventListener('resize', this.onResize.bind(this));
         this.onResize();
@@ -58,12 +54,15 @@ RenderContext.prototype.ensureCamera = function() {
  * Called when the user resizes the window
  */
 RenderContext.prototype.onResize = function() {
-    this.rect = this.canvas.getBoundingClientRect();
+    this.rect = { width: 1000,
+                  height: 1000 };
     if (this.streamset) {
         this.view = new StreamSetView(this.streamset, this.rect.width, this.rect.height);
     }
 
-    this.camera.aspect = this.perspective();
+    var windowrect = this.canvas.getBoundingClientRect();
+    var perspective = windowrect.width / windowrect.height;
+    this.camera.aspect = perspective;
     this.camera.updateProjectionMatrix();
     this.onControlsChange();
 };
@@ -99,6 +98,13 @@ RenderContext.prototype.add_activities_to_scene = function(streamset) {
     var totalspheres = 0;
     var materials = {};
 
+    // this.view.allBucketActivities(function(activitystream, index) {
+    //     var lambertMaterial = this.getMaterial(color(index));
+    //     var geometry = new THREE.Geometry();
+
+    //     for
+    // });
+
     streamset.activities().forEach(function(activity, index) {
         var lambertMaterial = this.getMaterial(color(index));
 
@@ -112,7 +118,8 @@ RenderContext.prototype.add_activities_to_scene = function(streamset) {
 
             // need to swap latlng -> lnglat
             var xy = this.view.projection([point[1], point[0]]);
-            var x = xy[0];
+            // invert x, Three.js starts on the other side.
+            var x = this.rect.width - xy[0];
             var y = xy[1];
             var z = this.view.scale_z(altitude);
 
@@ -151,22 +158,18 @@ RenderContext.prototype.add_backing_plane = function() {
     var lambertMaterial =
             new THREE.MeshLambertMaterial( { color: 0xdddddd, shading: THREE.FlatShading } );
     // backing plane for visual reference
-    var rect = this.canvas.getBoundingClientRect();
-    var planeSize = Math.max(rect.width, rect.height);
-    // use planeSize when we correctly scale height/width
-    var planeGeometry = new THREE.PlaneGeometry( planeSize, planeSize);
+    var planeGeometry = new THREE.PlaneGeometry( this.rect.width, this.rect.height);
     var planeMaterial = new THREE.MeshBasicMaterial( {color: 0xaaaaaa, side: THREE.DoubleSide} );
     var plane = new THREE.Mesh( planeGeometry, lambertMaterial );
-    plane.position.x = planeSize / 2;
-    plane.position.y = planeSize / 2;
+    plane.position.x = this.rect.width / 2;
+    plane.position.y = this.rect.height / 2;
     plane.position.z = 0;
     this.scene.add(plane);
 };
 
 RenderContext.prototype.add_light = function() {
-    var rect = this.canvas.getBoundingClientRect();
     var pointLight = new THREE.PointLight(0xffffff, 1);
-    pointLight.position.set(rect.width, rect.height, 300);
+    pointLight.position.set(this.rect.width, this.rect.height, 300);
 	this.scene.add( new THREE.AmbientLight( 0x111111 ) );
     this.scene.add( pointLight );
 };
@@ -269,8 +272,10 @@ RenderContext2d.prototype.draw_activities = function() {
     this.ctx.save();
     this.ctx.strokeStyle = 'black';
     this.ctx.lineWidth = 1;
+
     var path = d3.geo.path().projection(this.view.projection);
     path.context(this.ctx);
+
     this.streamset.activities().forEach(function(activity) {
         this.ctx.beginPath();
         // actually write to the context
