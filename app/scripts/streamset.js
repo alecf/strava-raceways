@@ -251,15 +251,20 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
     });
   }
 
-    var bucketlog = 3;
+  var bucketlog = 3;
+  /**
+   * Get the center of an array of coordinates of the form [lat, lng, altitude]
+   *
+   * Returns an array of [lat, lng, altitude, [coordinates...]]
+   */
   function CoordinatesCenter(coordinates) {
       var latlng_center = d3.geo.centroid({
           type: 'MultiPoint',
           coordinates: coordinates});
       var average_altitude = d3.sum(_.pluck(coordinates, 2)) / coordinates.length;
-      var result = [latlng_center[0], latlng_center[1], average_altitude];
+      var result = [latlng_center[0], latlng_center[1], average_altitude, coordinates];
       if (bucketlog-- > 0) {
-          console.log("BucketCenter of ", coordinates, " is ", result);
+          // console.log("BucketCenter of ", coordinates, " is ", result);
       }
       return result;
   }
@@ -310,12 +315,12 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
 
   // Center of all points in the bucket. Note that this is leaving out
   // altitude!
-    function BucketCenter(bucketInfo) {
-      var coordinates = _(bucketInfo)
-            .map(_.values)
-            .flatten(true)
-            .pluck('coord')
-            .value();
+  function BucketCenter(bucketInfo) {
+    var coordinates = _(bucketInfo)
+          .map(_.values)
+          .flatten(true)
+          .pluck('coord')
+          .value();
     return CoordinatesCenter(coordinates);
   }
 
@@ -342,7 +347,8 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
             return BucketCenter(bucketInfo);
           })
           .unique(false, function(center) {
-            return center.join('\n');
+            // Unique only by by [lng, lat, alt]
+            return center.slice(0,3).join('\n');
           })
           .value();
 
@@ -355,18 +361,27 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
    */
   StreamSet.prototype.allBucketStreams = function() {
     // This will be a map from activity_index to the array of buckets.
+    // Returns pairs of
+    // [[b0, b1, b2], bucketInfo]
+    // where bucketInfo is { 0: [coord1, coord2, etc.. ],
+    //                       1: [coord1, coord2, etc.. ], ... }
     var buckets_by_bucketindex = ExtractSparseArray(this.bucketCount, 3);
 
+    // First we'll need to fill up activity_coords with a bunch if
+    // counters, one for each activity.
+    // TODO(alecflett): This is absurd! we just need a slot for 0..activities.length
     var activity_coords = {};
+
     // extract a list of activity_indexes
     _(buckets_by_bucketindex)
-      // extract bucket
+    // extract bucket
       .map(function(pair) {
+        // grab just the bucketInfo
         return pair[1];
       })
       // extract activity_indexes
-      .map(function(bucket) {
-        return Object.keys(bucket);
+      .map(function(bucketInfo) {
+        return Object.keys(bucketInfo);
       })
       // uniquify across all buckets
       .flatten()
@@ -386,7 +401,7 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
         _(bucketInfo).forEach(function(points, activity_index) {
           // the sort is the challenge here. We're pushing them in
           // bucket order. So instead, we'll put the activity's stream
-          // order into the array, and sort it it later.
+          // order into the array, and re-sort it it later.
           _(points).keys().forEach(function(stream_entry_index) {
             activity_coords[activity_index].push(
               [parseInt(stream_entry_index), bucket_center]);
@@ -402,12 +417,14 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
             points.sort(function(a, b) {
               return a[0] - b[0];
             });
+
+            // uniquify them across buckets
             var unique = _(points)
                   .map(function(streampoint) {
                     return streampoint[1];
                   })
                   .unique(true, function(point) {
-                    return point.join('\n');
+                    return point.slice(0,3).join('\n');
                   })
                   .value();
             return unique;
@@ -466,17 +483,35 @@ StreamSetView = (function() {
     return this.streamset.allCoordinates().map(this.projection);
   };
 
-    StreamSetView.prototype.allBucketCoordinates = function() {
-        var bucketCoordinates = this.streamset.allBucketCoordinates();
-        console.log("allBucketCoordinates got ", bucketCoordinates);
-        return bucketCoordinates.map(this.projection);
-    };
+  StreamSetView.prototype.allBucketCoordinates = function() {
+    var bucketCoordinates = this.streamset.allBucketCoordinates();
+    return bucketCoordinates.map(this.projection);
+  };
 
   StreamSetView.prototype.allBucketStreams = function() {
-      return this.streamset.allBucketStreams().map(function(stream) {
-          return stream.map(this.projection);
-      }, this);
+    return this.streamset.allBucketStreams().map(function(stream) {
+      return stream.map(this.projection).map(function(bucket, index) {
+        return [bucket[0], bucket[1], stream[index][2], stream[index][3]];
+      });
+    }, this);
   };
+
+  StreamSetView.prototype.pixelsPerMeter = function() {
+    var lat_distance = d3.geo.distance(
+      this.projection.invert([this.width/2, 0]),
+      this.projection.invert([this.width/2, this.height])) * 6378000;
+    var lng_distance = d3.geo.distance(
+      this.projection.invert([0, this.height/2]),
+      this.projection.invert([this.width, this.height/2])) * 6378000;
+    console.log("Estimated pixels per radian: ", lat_distance, lng_distance, (lat_distance + lng_distance)/2);
+    var lat_ratio = this.height / lat_distance;
+    var lng_ratio = this.width / lng_distance;
+    console.log("Ratios are: ", lat_ratio, lng_ratio);
+    return (lat_ratio + lng_ratio) / 2;
+  };
+
+
+
 
   return StreamSetView;
 })();

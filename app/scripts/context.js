@@ -88,7 +88,6 @@ RenderContext.prototype.getMaterial = function(color) {
     return this.materials_[color];
 };
 
-
 RenderContext.prototype.add_activities_to_scene = function(streamset) {
     var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
 
@@ -97,34 +96,31 @@ RenderContext.prototype.add_activities_to_scene = function(streamset) {
 
     var totalspheres = 0;
     var materials = {};
+    RCV = this.view;
+    var ppm = this.view.pixelsPerMeter() * 10;
 
-    // this.view.allBucketActivities(function(activitystream, index) {
-    //     var lambertMaterial = this.getMaterial(color(index));
-    //     var geometry = new THREE.Geometry();
+    this.view.scale_z.domain([0,100]).range([0, 100*ppm]);
+    console.log("scale_z: ", this.view.scale_z.domain(), " => ", this.view.scale_z.range());
+    // guess at horizontal and vertical distances to map pixels to meters?
 
-    //     for
-    // });
-
-    streamset.activities().forEach(function(activity, index) {
-        var lambertMaterial = this.getMaterial(color(index));
+    this.view.allBucketStreams().forEach(function(activitystream, index) {
+        // console.log("bucketstream ", index, " starts with ", activitystream.slice(0,20));
+        // console.log("   activity has", this.view.streamset.activities_[index].stream.altitude.data.length, " total points");
+        var geometry = new THREE.Geometry();
 
         //console.log("drawing activity ", index, ": ", activity);
         var geometry = new THREE.Geometry();
         var spherecount = 0;
-        for (var i = 0; i < activity.stream.altitude.data.length; ++i) {
-            var point = activity.stream.latlng.data[i];
-            var altitude = activity.stream.altitude.data[i];
-            var proximity = activity.stream.proximity.data[i];
+        activitystream.forEach(function(point) {
+            var altitude = point[2];
+            var proximity = point[3];
 
-            // need to swap latlng -> lnglat
-            var xy = this.view.projection([point[1], point[0]]);
-            // invert x, Three.js starts on the other side.
-            var x = this.rect.width - xy[0];
-            var y = xy[1];
+            var x = this.rect.width - point[0];
+            var y = point[1];
             var z = this.view.scale_z(altitude);
 
             geometry.vertices.push(new THREE.Vector3(x, y, z));
-
+            var i = 0;
             // gad this is expensive
             var radius = proximityRadius(proximity);
             if (proximity > 1 &&
@@ -139,8 +135,8 @@ RenderContext.prototype.add_activities_to_scene = function(streamset) {
                 sphereMesh.position.set(x,y,z);
                 this.scene.add(sphereMesh);
             }
-        }
-        //console.log("Activity ", index, " got ", spherecount, " spheres");
+        }.bind(this));
+        console.log("Activity ", index, " got ", spherecount, " spheres");
         totalspheres += spherecount;
         var material = new THREE.LineBasicMaterial({
             color: color(index),
@@ -235,7 +231,6 @@ RenderContext2d.prototype.onResize = function(event) {
     var rect = this.canvas.getBoundingClientRect();
     this.canvas.setAttribute("width", rect.width);
     this.canvas.setAttribute("height", rect.height);
-    console.log("Resized to ", rect.width, ", ", rect.height);
     this.updatescene();
 };
 
