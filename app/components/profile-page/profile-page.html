@@ -46,9 +46,9 @@
           </paper-icon-button>
           
           <div layout vertical fit>
-              <canvas id="canvas3d" width="800" height="400" flex></canvas>
+              <canvas id="canvas3d" width="1000" height="1000" flex></canvas>
               <core-splitter on-core-resize="{{onSplitterMove}}" direction="down"></core-splitter>
-              <canvas id="canvas2d" width="800" height="194" on-scroll="{{on2dScroll}}"></canvas>
+              <canvas id="canvas2d" width="1000" height="1000" on-scroll="{{on2dScroll}}"></canvas>
           </div>
       </core-scaffold>
       <core-ajax id="refreshAjax" url="/api/update?count=30"

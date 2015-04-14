@@ -47,10 +47,6 @@ class UpdateHandler(BaseHandler):
 
         athlete = model.Athlete.get_by_id(id=athlete_id)
 
-        print "Requesting API call: %s" % api_call('athlete/activities',
-                                                      id=athlete_id,
-                                                      per_page=per_page,
-                                                      resolution=resolution)
         activities = yield self.arc.urlfetch(api_call('athlete/activities',
                                                       id=athlete_id,
                                                       per_page=per_page,
@@ -104,10 +100,7 @@ class UpdateHandler(BaseHandler):
                                                                      pairwise(stream_records)):
             if latlng_stream is None or altitude_stream is None:
                 stream_requests.append(activity_record.key.id())
-            else:
-                print "Have latlng and altitude for {}".format(activity_record.key.id())
 
-        print "Missing {} streams, fetching".format(len(stream_requests))
         pending_stream_requests = yield self.fetch_streams(
             stream_requests, resolution=resolution)
 
@@ -138,8 +131,6 @@ class UpdateHandler(BaseHandler):
     def fetch_streams(self, activity_ids, resolution=None):
         pending_stream_requests = {}
         for id in activity_ids:
-            print "STREAM: %s "% api_call('activities/{}/streams/latlng,altitude'.format(id),
-                         resolution=resolution)
             f = self.arc.urlfetch(
                 api_call('activities/{}/streams/latlng,altitude'.format(id),
                          resolution=resolution))

@@ -107,8 +107,9 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
                       function(d) { return d.domain.alt[1]; }),
     };
 
-    this.scale_z = d3.scale.linear().domain([extents.min_alt,
-                                             extents.max_alt]);
+    this.scale_x = d3.scale.linear();
+    this.scale_y = d3.scale.linear();
+    this.scale_z = d3.scale.linear();
     this.generate_proximity_streams(40);
   };
 
@@ -164,7 +165,9 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
     var bucket_lat = d3.scale.linear().domain([this.extents_.min_lat,
                                                this.extents_.max_lat])
           .rangeRound([0,n]).clamp(true);
-    var bucket_z = this.scale_z.copy().rangeRound([0, n]).clamp(true);
+    var bucket_z = this.scale_z.copy().domain([this.extents_.min_alt,
+                                               this.extents_.max_alt])
+          .rangeRound([0, n]).clamp(true);
 
     this.bucket_lng = bucket_lng;
     this.bucket_lat = bucket_lat;
@@ -258,11 +261,17 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
    * Returns an array of [lat, lng, altitude, [coordinates...]]
    */
   function CoordinatesCenter(coordinates) {
-      var latlng_center = d3.geo.centroid({
-          type: 'MultiPoint',
-          coordinates: coordinates});
-      var average_altitude = d3.sum(_.pluck(coordinates, 2)) / coordinates.length;
-      var result = [latlng_center[0], latlng_center[1], average_altitude, coordinates];
+    var latlng_center = d3.geo.centroid({
+      type: 'MultiPoint',
+      coordinates: coordinates
+    });
+
+    var average_altitude = d3.sum(_.pluck(coordinates, 2)) / coordinates.length;
+    var result = [latlng_center[0],
+                  latlng_center[1],
+                  average_altitude,
+                  //coordinates];
+                 ];
       if (bucketlog-- > 0) {
           // console.log("BucketCenter of ", coordinates, " is ", result);
       }
@@ -321,7 +330,7 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
           .flatten(true)
           .pluck('coord')
           .value();
-    return CoordinatesCenter(coordinates);
+    return CoordinatesCenter(coordinates).concat([bucketInfo]);
   }
 
   StreamSet.prototype.allCoordinates = function() {
@@ -340,6 +349,10 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
    * Gets the centroid of each bucket that have paths through it.
    */
   StreamSet.prototype.allBucketCoordinates = function() {
+    // Returns pairs of
+    // [[x_index, y_index, z_index], bucketInfo]
+    // where bucketInfo is { 0: [coord1, coord2, etc.. ],
+    //                       1: [coord1, coord2, etc.. ], ... }
     var buckets_by_bucketindex = ExtractSparseArray(this.bucketCount, 3);
     var bucket_averages = _(buckets_by_bucketindex)
           .map(function(pair) {
@@ -444,6 +457,8 @@ StreamSetView = (function() {
     this.streamset = streamset;
     this.width = width;
     this.height = height;
+    this.scale_x = streamset.scale_x.copy();
+    this.scale_y = streamset.scale_y.copy();
     this.scale_z = streamset.scale_z.copy()
       .range([100, 500]); // lower number = darker = lower altitude
     this.projection = get_best_projection(width, height, streamset.features);
@@ -489,10 +504,20 @@ StreamSetView = (function() {
   };
 
   StreamSetView.prototype.allBucketStreams = function() {
+    var scale_x = this.scale_x;
+    var scale_y = this.scale_y;
+    var scale_z = this.scale_z;
+    var projection = this.projection;
     return this.streamset.allBucketStreams().map(function(stream) {
-      return stream.map(this.projection).map(function(bucket, index) {
-        return [bucket[0], bucket[1], stream[index][2], stream[index][3]];
-      });
+      return stream.map(projection)
+        .map(function(bucket, index) {
+          return [scale_x(bucket[0]),
+                  scale_y(bucket[1]),
+                  // copy over altitude and proximity data from
+                  // original stream
+                  scale_z(stream[index][2]),
+                  stream[index][3]];
+        }, this);
     }, this);
   };
 

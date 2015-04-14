@@ -6,11 +6,14 @@ function RenderContext(canvas) {
     this.renderer = new THREE.WebGLRenderer({
             canvas: canvas
     });
+    // this.renderer.setSize(1000, 1000);
     this.canvas = canvas;
     this.materials_ = {};
+    this.line_materials_ = {};
+    this.spheres_ = {};
     this.pending_render = false;
 }
-RenderContext.MAX_SPHERES = 0;
+RenderContext.MAX_SPHERES = 100;
 
 RenderContext.prototype.render3d = function() {
     this.controls.update();
@@ -56,10 +59,6 @@ RenderContext.prototype.ensureCamera = function() {
 RenderContext.prototype.onResize = function() {
     this.rect = { width: 1000,
                   height: 1000 };
-    if (this.streamset) {
-        this.view = new StreamSetView(this.streamset, this.rect.width, this.rect.height);
-    }
-
     var windowrect = this.canvas.getBoundingClientRect();
     var perspective = windowrect.width / windowrect.height;
     this.camera.aspect = perspective;
@@ -88,55 +87,111 @@ RenderContext.prototype.getMaterial = function(color) {
     return this.materials_[color];
 };
 
+RenderContext.prototype.getLineMaterial = function(color, linewidth) {
+    if (linewidth === undefined)
+        linewidth = 1;
+
+    var key = [color, linewidth].join('\n');
+
+    if (!(key in this.line_materials_)) {
+        this.materials_[key] = new THREE.LineBasicMaterial( {
+            color: color,
+            linewidth: linewidth,
+        } );
+    }
+    return this.line_materials_[linewidth];
+};
+
+RenderContext.prototype.getSphere = function(radius) {
+    if (!(radius in this.spheres_)) {
+        this.spheres_[radius] = new THREE.SphereGeometry(radius, 16, 12);
+    }
+    return this.spheres_[radius];
+};
+
+/**
+ * Return a vector for the normal from start that generally follows
+ * "points" - points will be given descending weights.
+ *
+ * @param start THREE.Vector3
+ * @param points Array of THREE.Vector3
+ * @param color The color for the line
+ * @param scale_z d3.scale.linear - this is temporary - really all of
+ *     the points should be pre-scaled.
+ */
+RenderContext.prototype.InterpolateNormal = function(start, points, color) {
+    var nextPoint = points[0];
+    if (nextPoint) {
+        var nextX = nextPoint[0];
+        var nextY = nextPoint[1];
+        var nextZ = nextPoint[2];
+        var nextPointVector = new THREE.Vector3(nextX, nextY, nextZ);
+        nextPointVector.sub(start);
+        nextPointVector.multiplyScalar(3);
+        nextPointVector.add(start);
+
+        var pointerGeometry = new THREE.Geometry();
+        pointerGeometry.vertices.push(start);
+        pointerGeometry.vertices.push(nextPointVector);
+
+        var pointerMaterial = this.getLineMaterial(color, 1);
+        var pointerLine = new THREE.Line(pointerGeometry, pointerMaterial);
+        return pointerLine;
+    }
+}
+
 RenderContext.prototype.add_activities_to_scene = function(streamset) {
     var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
 
     var proximityRadius = d3.scale.linear().domain([1, streamset.maxProximity_]);
     proximityRadius.rangeRound([0, 4]);
+    console.log("Proximities mapping ", proximityRadius.domain(), " => ", proximityRadius.range());
 
     var totalspheres = 0;
     var materials = {};
     RCV = this.view;
-    var ppm = this.view.pixelsPerMeter() * 10;
 
-    this.view.scale_z.domain([0,100]).range([0, 100*ppm]);
-    console.log("scale_z: ", this.view.scale_z.domain(), " => ", this.view.scale_z.range());
-    // guess at horizontal and vertical distances to map pixels to meters?
 
-    this.view.allBucketStreams().forEach(function(activitystream, index) {
-        // console.log("bucketstream ", index, " starts with ", activitystream.slice(0,20));
+    var bucketStreams = this.view.allBucketStreams();
+
+
+    //console.log("Got bucketstreams: ", bucketStreams);
+    bucketStreams.forEach(function(activitystream, index) {
+        // console.log("bucketstream ", index, " starts with ",
+        //              activitystream.slice(0,5)
+        //              .map(function(point) { return point[3].length; }));
         // console.log("   activity has", this.view.streamset.activities_[index].stream.altitude.data.length, " total points");
-        var geometry = new THREE.Geometry();
 
-        //console.log("drawing activity ", index, ": ", activity);
         var geometry = new THREE.Geometry();
         var spherecount = 0;
-        activitystream.forEach(function(point) {
-            var altitude = point[2];
+        activitystream.forEach(function(point, i) {
             var proximity = point[3];
 
-            var x = this.rect.width - point[0];
+            var x = point[0];
             var y = point[1];
-            var z = this.view.scale_z(altitude);
+            var z = point[2];
 
-            geometry.vertices.push(new THREE.Vector3(x, y, z));
-            var i = 0;
+            var pointVector = new THREE.Vector3(x, y, z);
+            geometry.vertices.push(pointVector);
+
+            // var normalLine = this.InterpolateNormal(
+            //     pointVector,
+            //     activitystream.slice(i, i+1),
+            //     color(index));
+
             // gad this is expensive
-            var radius = proximityRadius(proximity);
-            if (proximity > 1 &&
-                radius >= 1 &&
-                totalspheres < RenderContext.MAX_SPHERES && // ugh artificial
-                !(i % 30)) {    //also artificial
+            var radius = proximityRadius(Object.keys(proximity).length);
+            if (false && radius >= 1) {
                 spherecount++;
-                var sphere = new THREE.SphereGeometry(radius);
-                var sphereMesh = new THREE.Mesh(sphere,
-                                                lambertMaterial);
+                var sphere = this.getSphere(radius);
+                var material = this.getMaterial(color(index));
+                var sphereMesh = new THREE.Mesh(sphere, material);
 
                 sphereMesh.position.set(x,y,z);
                 this.scene.add(sphereMesh);
             }
         }.bind(this));
-        console.log("Activity ", index, " got ", spherecount, " spheres");
+
         totalspheres += spherecount;
         var material = new THREE.LineBasicMaterial({
             color: color(index),
@@ -147,7 +202,7 @@ RenderContext.prototype.add_activities_to_scene = function(streamset) {
         var line = new THREE.Line(geometry, material);
         this.scene.add(line);
     }, this);
-
+    console.log("Total spheres: ", totalspheres);
 };
 
 RenderContext.prototype.add_backing_plane = function() {
@@ -174,6 +229,15 @@ RenderContext.prototype.updatescene = function(streamset) {
 
     this.ensureCamera();
     this.view = new StreamSetView(streamset, this.rect.width, this.rect.height);
+    if (this.view) {
+        // reverse x
+        this.view.scale_x.domain([0, this.rect.width])
+            .range([this.rect.width, 0]);
+        // This should all be done inside the view.
+        var ppm = this.view.pixelsPerMeter() * 10;
+        console.log("Got ", ppm, " pixelsPerMeter");
+        this.view.scale_z.domain([0,100]).range([0, 100*ppm]);
+    }
 
     var max_z = -1;
     var min_z = -1;
