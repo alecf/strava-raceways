@@ -15,6 +15,9 @@ StreamSet = (function() {
     this.xhr_ = xhrContext;
     this.activities_ = activities;
     this.resolution = resolution;
+    this.scale_x = d3.scale.linear();
+    this.scale_y = d3.scale.linear();
+    this.scale_z = d3.scale.linear();
   }
 
   /**
@@ -30,6 +33,7 @@ StreamSet = (function() {
                                       resolution: this.resolution })
       .then(function(streams) {
         var stream = streams.result.streams[activity_id];
+        activity.stream = stream;
         if (!stream.latlng ||
             !stream.latlng.data) {
           console.log("Missing latlng: ", stream.latlng);
@@ -41,13 +45,14 @@ StreamSet = (function() {
             type: 'LineString',
             coordinates: stream.latlng.data.map(function(latlng, i) {
               // geojson uses lnglat
-              return [latlng[1], latlng[0],
-                      stream.altitude.data[i]];
+              var altitude = stream.altitude &&
+                    stream.altitude.data &&
+                    stream.altitude.data[i] || 0;
+              return [latlng[1], latlng[0], altitude];
             })
           }
         };
         stream.geojson = geojson;
-        activity.stream = stream;
         return activity;
       });
   };
@@ -96,28 +101,34 @@ StreamSet = (function() {
    */
   StreamSet.prototype.consume_index = function(stream_indexes) {
 
-    this.features = join_geojsons(stream_indexes.map(function(metadata) {
-      return metadata.geojson;
-    }));
+    this.features = join_geojsons(stream_indexes
+                                  .filter(function(metadata) {
+                                    return metadata.geojson; })
+                                  .map(function(metadata) {
+                                    return metadata.geojson;
+                                  }));
 
     var extents = this.extents_ = {
-      min_lat: d3.min(stream_indexes,
-                      function(d) { return d.domain.lat[0]; }),
-      max_lat: d3.max(stream_indexes,
-                      function(d) { return d.domain.lat[1]; }),
-      min_lng: d3.min(stream_indexes,
-                      function(d) { return d.domain.lng[0]; }),
-      max_lng: d3.max(stream_indexes,
-                      function(d) { return d.domain.lng[1]; }),
-      min_alt: d3.min(stream_indexes,
-                      function(d) { return d.domain.alt[0]; }),
-      max_alt: d3.max(stream_indexes,
-                      function(d) { return d.domain.alt[1]; }),
+      min_lat: d3.min(stream_indexes, function(d) {
+        return d.domain.lat && d.domain.lat[0] || Infinity;
+      }),
+      max_lat: d3.max(stream_indexes, function(d) {
+        return d.domain.lat && d.domain.lat[1] || -Infinity;
+      }),
+      min_lng: d3.min(stream_indexes, function(d) {
+        return d.domain.lng && d.domain.lng[0] || Infinity;
+      }),
+      max_lng: d3.max(stream_indexes, function(d) {
+        return d.domain.lng && d.domain.lng[1] || -Infinity;
+      }),
+      min_alt: d3.min(stream_indexes, function(d) {
+        return d.domain.alt && d.domain.alt[0] || Infinity;
+      }),
+      max_alt: d3.max(stream_indexes, function(d) {
+        return d.domain.alt && d.domain.alt[1] || -Infinity;
+      }),
     };
 
-    this.scale_x = d3.scale.linear();
-    this.scale_y = d3.scale.linear();
-    this.scale_z = d3.scale.linear();
     this.generate_proximity_streams(40);
   };
 
@@ -136,6 +147,9 @@ StreamSet = (function() {
    */
   StreamSet.prototype.withGeoData = function(callback) {
     return this.activities_.map(function(activity, activity_index) {
+      if (!activity.stream || !activity.stream.geojson) {
+        return null;
+      }
       var coordinates = activity.stream.geojson.geometry.coordinates;
       return coordinates.map(function(coordinates, coord_index) {
         return callback.call(this,
@@ -227,21 +241,23 @@ StreamSet = (function() {
   // generate metadata about a single stream. Returns a promise of the data
   function index_stream(activity) {
     var stream = activity.stream;
-    if (!stream) {
-      return Promise.reject(["Missing stream in ", activity]);
-    }
+    // if (!activity.stream) {
+    //   return Promise.reject(["Missing stream in ", activity]);
+    // }
     return new Promise(function(resolve, reject) {
       var metadata = {domain: {}};
 
-      metadata.geojson = stream.geojson;
-      var latlng_stream = stream.latlng;
-      var alt_stream = stream.altitude;
-      if (latlng_stream && latlng_stream.data) {
-        metadata.domain.lat = d3.extent(latlng_stream.data, accessor(0));
-        metadata.domain.lng = d3.extent(latlng_stream.data, accessor(1));
-      }
-      if (alt_stream && alt_stream.data) {
-        metadata.domain.alt = d3.extent(alt_stream.data);
+      if (stream) {
+        metadata.geojson = stream.geojson;
+        var latlng_stream = stream.latlng;
+        var alt_stream = stream.altitude;
+        if (latlng_stream && latlng_stream.data) {
+          metadata.domain.lat = d3.extent(latlng_stream.data, accessor(0));
+          metadata.domain.lng = d3.extent(latlng_stream.data, accessor(1));
+        }
+        if (alt_stream && alt_stream.data) {
+          metadata.domain.alt = d3.extent(alt_stream.data);
+        }
       }
       resolve(metadata);
     });
@@ -462,7 +478,6 @@ StreamSetView = (function() {
    * into, get the best geo projection.
    */
   function get_best_projection(width, height, features) {
-    //var center = d3.geo.centroid(features);
     var scale = 1;            // strawman
     var offset = [0,0];
 
