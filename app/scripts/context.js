@@ -61,6 +61,7 @@ RenderContext.prototype.onResize = function() {
                   height: 1000 };
     var windowrect = this.canvas.getBoundingClientRect();
     var perspective = windowrect.width / windowrect.height;
+    this.ensureCamera();
     this.camera.aspect = perspective;
     this.camera.updateProjectionMatrix();
     this.onControlsChange();
