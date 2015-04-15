@@ -1,3 +1,6 @@
+/**
+ * A really simple representation of just the activities.
+ */
 function Dataset(facetList, xhr, resolution) {
     this.facetList = facetList;
     this.xhr_ = xhr;
@@ -8,17 +11,26 @@ function Dataset(facetList, xhr, resolution) {
         });
 }
 
+/**
+ * Get the raw, unfiltered activities.
+ */
 Dataset.prototype.raw_activities = function() {
     return this._pending_activities;
 };
 
+/**
+ * Get the activities after filters have been applied.
+ */
 Dataset.prototype.activities = function() {
     return this._pending_activities.then(function(activities) {
-        return this.run_filters(activities);
+        return this.run_filters_(activities);
     }.bind(this));
 };
 
-Dataset.prototype.run_filters = function(activities) {
+/**
+ * Run the current filters against the raw set of activities.
+ */
+Dataset.prototype.run_filters_ = function(activities) {
     var result = [];
     var filters = this.facetList.getFilterValues();
     console.log("Runnning filters against ", filters);
