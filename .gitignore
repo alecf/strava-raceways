@@ -21,14 +21,6 @@ lib64
 __pycache__
 
 # third party
-pytz
-requests
-stravalib
-units
-apiclient
-oauth2
-oauth2client
-uritemplate
 
 # Installer logs
 pip-log.txt
