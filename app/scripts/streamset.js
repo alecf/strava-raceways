@@ -4,23 +4,25 @@
 // requires d3.js and lodash
 StreamSet = (function() {
 
-/**
- * Create a new streamset
- *
- * @param activities A list of metadata about activities.
- * @param xhrContext Context for making further XHR calls.
- * @param resolution 'high' / 'medium' / 'low'
- */
-function StreamSet(activities, xhrContext, resolution, proximity_sample) {
+  /**
+   * Create a new streamset
+   *
+   * @param activities A list of metadata about activities.
+   * @param xhrContext Context for making further XHR calls.
+   * @param resolution 'high' / 'medium' / 'low'
+   */
+  function StreamSet(activities, xhrContext, resolution, proximity_sample) {
     this.xhr_ = xhrContext;
     this.activities_ = activities;
     this.resolution = resolution;
-}
+  }
 
-  // Get a stream and attach it to the activity. Returns a promise that
-  // resolves to a copy of the activity, and a 'stream' property with
-  // stream data.
-  StreamSet.prototype.load_stream = function(activity) {
+  /**
+   * Get a stream and attach it to the activity. Returns a promise
+   * that resolves to a copy of the activity, and a 'stream' property
+   * with stream data.
+   */
+  StreamSet.prototype.load_stream_ = function(activity) {
     var activity_id = activity.activity_id;
     if (activity.stream)
       return Promise.resolve(activity);
@@ -51,11 +53,13 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
   };
 
 
-  // Returns a promise that resolves the an array of all activities
-  StreamSet.prototype.load_streams = function(activities) {
+  /**
+   * Returns a promise that resolves the an array of all activities.
+   */
+  StreamSet.prototype.load_streams_ = function(activities) {
     var results = [];
     for (var i = 0; i < activities.length; ++i) {
-      results.push(this.load_stream(activities[i]));
+      results.push(this.load_stream_(activities[i]));
     }
     return Promise.all(results)
       .then(function(e) {
@@ -64,11 +68,13 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
       });
   };
 
-
+  /**
+   * Returns a promise that resolves when this streamset is fully loaded.
+   */
   StreamSet.prototype.ready = function() {
     if (!this.ready_) {
       this.ready_ =
-        this.load_streams(this.activities_)
+        this.load_streams_(this.activities_)
         .then(index_streams)
         .then(this.consume_index.bind(this))
         .catch(function(ex) {
@@ -85,7 +91,9 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
     };
   }
 
-  // xxx need a better name
+  /**
+   * Calculates various extents across all the streams.
+   */
   StreamSet.prototype.consume_index = function(stream_indexes) {
 
     this.features = join_geojsons(stream_indexes.map(function(metadata) {
@@ -113,10 +121,19 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
     this.generate_proximity_streams(40);
   };
 
+  /**
+   * Direct access to the activites - this should be done with a
+   * promise :(
+   */
   StreamSet.prototype.activities = function() {
     return this.activities_;
   };
 
+  /**
+   * Iterates over geo data with the given callback.
+   * The callback should have the signature:
+   *    function(lat, lng, altitude, activity_index, coord_index)
+   */
   StreamSet.prototype.withGeoData = function(callback) {
     return this.activities_.map(function(activity, activity_index) {
       var coordinates = activity.stream.geojson.geometry.coordinates;
@@ -130,30 +147,6 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
       });
     });
   };
-
-  /**
-   * A lazy deep dictionary. Pass keys as arguments, and dicts will be
-   * created lazily along the way.
-   *
-   * Usage:
-   * DeepBucket(bucket, x1,y1,z1).foo = 'bar';
-   * DeepBucket(bucket, x2,y2,z2).name = 'baz'
-   *
-   * Now bucket[x1][y1][z1].foo == 'bar'
-   */
-  DB = DeepBucket;
-  function DeepBucket(bucket) {
-    // chop off 'bucket'
-    var keys = Array.prototype.slice.call(arguments, 1);
-    for (var i = 0; i < keys.length; i++) {
-      var key = keys[i];
-      if (!(key in bucket)) {
-        bucket[key] = {};
-      }
-      bucket = bucket[key];
-    }
-    return bucket;
-  }
 
   // adds a 'proximity' stream to each activity
   // A proximity stream is
@@ -183,7 +176,7 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
       var blng = bucket_lng(lng);
       var blat = bucket_lat(lat);
       var bz = bucket_z(alt);
-      var bucket = DeepBucket(bucketCount, blng, blat, bz,
+      var bucket = SparseArray(bucketCount, blng, blat, bz,
                               activity_index, coord_index);
       bucket.coord = [lng, lat, alt];
     }
@@ -191,7 +184,7 @@ function StreamSet(activities, xhrContext, resolution, proximity_sample) {
       lng = bucket_lng(lng);
       lat = bucket_lat(lat);
       var z = bucket_z(alt);
-      return Object.keys(DeepBucket(bucketCount, lng, lat, z)).length;
+      return Object.keys(SparseArray(bucketCount, lng, lat, z)).length;
     }
     // this is kind of a map-reduce style index: count up all
     // lat/lng/altitude combos, then redistribute the counts out to
@@ -521,6 +514,11 @@ StreamSetView = (function() {
     }, this);
   };
 
+  /**
+   * Get the number of pixels across the x and y dimension.
+   *
+   * @return [lngppm, latppm].
+   */
   StreamSetView.prototype.pixelsPerMeter = function() {
     var lat_distance = d3.geo.distance(
       this.projection.invert([this.width/2, 0]),
@@ -528,15 +526,12 @@ StreamSetView = (function() {
     var lng_distance = d3.geo.distance(
       this.projection.invert([0, this.height/2]),
       this.projection.invert([this.width, this.height/2])) * 6378000;
-    console.log("Estimated pixels per radian: ", lat_distance, lng_distance, (lat_distance + lng_distance)/2);
+
+    // take the average across height and width.
     var lat_ratio = this.height / lat_distance;
     var lng_ratio = this.width / lng_distance;
-    console.log("Ratios are: ", lat_ratio, lng_ratio);
-    return (lat_ratio + lng_ratio) / 2;
+    return [lng_ratio, lat_ratio];
   };
-
-
-
 
   return StreamSetView;
 })();

@@ -234,7 +234,7 @@ RenderContext.prototype.updatescene = function(streamset) {
         this.view.scale_x.domain([0, this.rect.width])
             .range([this.rect.width, 0]);
         // This should all be done inside the view.
-        var ppm = this.view.pixelsPerMeter() * 10;
+        var ppm = d3.mean(this.view.pixelsPerMeter()) * 10;
         console.log("Got ", ppm, " pixelsPerMeter");
         this.view.scale_z.domain([0,100]).range([0, 100*ppm]);
     }
