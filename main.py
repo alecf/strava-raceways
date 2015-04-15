@@ -21,6 +21,8 @@ import json
 
 from google.appengine.api import oauth, users, memcache, urlfetch
 
+from requests.packages import urllib3
+
 from raceways import JINJA_ENVIRONMENT
 from raceways.handler import BaseHandler
 from raceways.handlers.login import LoginHandler
