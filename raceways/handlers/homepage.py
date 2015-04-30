@@ -31,11 +31,13 @@ class HomepageHandler(BaseHandler):
             activities = []
             stream = []
 
+        print help(self.user)
+        print "User has: %s" % dir(self.user)
         template_values = {
             'strava_credentials': strava_credentials_json,
             'strava_login_url': strava_auth_uri,
-            'logout_url': users.create_logout_url('/'),
-            'login_url': users.create_login_url('/'),
+            'logout_url': '/logout',
+            'login_url': '/login',
             'user': self.user,
             }
         return template_values

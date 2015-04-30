@@ -7,7 +7,7 @@ setup(
         'identity-toolkit-python-client',
         'urllib3'
         'webapp2',
-        'stravalib'
+        'stravalib',
         ],
     license="MIT",
     version="0.1",

@@ -9,3 +9,9 @@ class LoginHandler(BaseHandler):
             self.strava_storage.put(credentials)
             return self.redirect('/')
 
+class LogoutHandler(BaseHandler):
+    def get(self):
+        if 'gtoken' in self.request.cookies:
+            del self.request.cookies['gtoken']
+
+        return self.redirect('/')

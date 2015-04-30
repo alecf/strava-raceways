@@ -9,6 +9,7 @@ import urllib
 import time
 import json
 import traceback
+from identitytoolkit import gitkitclient
 
 # for async context
 from google.appengine.ext import ndb
@@ -23,10 +24,14 @@ from raceways import JINJA_ENVIRONMENT
 from raceways import util
 from raceways.client import StravaClient
 
-CLIENT_SECRETS = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                              "client_secret.json")
+# CLIENT_SECRETS = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+#                               "client_secret.json")
 STRAVA_SECRETS = os.path.join(os.path.dirname(os.path.dirname(__file__)),
                               "strava_secret.json")
+
+gitkit_instance = gitkitclient.GitkitClient.FromConfigFile(
+    os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                 "gitkit-server-config.json"))
 
 class NoStravaUser(BaseException):
     pass
@@ -90,6 +95,8 @@ def api_handler(f):
 def authorized(f):
     @wraps(f)
     def wrapper(self, *args, **kwds):
+        if 'gtoken' in self.request.cookies:
+            self.user = gitkit_instance.VerifyGitkitToken(self.request.cookies['gtoken'])
         if not self.user or not self.strava_storage.get():
             print "Redirecting..."
             return self.redirect('/')
@@ -171,10 +178,12 @@ class BaseHandler(webapp2.RequestHandler):
         self.deadline = time.time() + 58        # 60 seconds plus buffer
         self.http = httplib2.Http(memcache)
         
-        self.user = users.get_current_user()
+        self.user = None
+        if 'gtoken' in self.request.cookies:
+            self.user = gitkit_instance.VerifyGitkitToken(self.request.cookies['gtoken'])
         
         if self.user:
-            self.strava_storage = StorageByKeyName(RacewaysUser, self.user.user_id(), 'strava_credentials')
+            self.strava_storage = StorageByKeyName(RacewaysUser, self.user.user_id, 'strava_credentials')
         # note that authorization has not happened yet
         self.strava = StravaClient(self.http)
 

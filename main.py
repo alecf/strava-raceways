@@ -25,8 +25,9 @@ from requests.packages import urllib3
 
 from raceways import JINJA_ENVIRONMENT
 from raceways.handler import BaseHandler
-from raceways.handlers.login import LoginHandler
+from raceways.handlers.login import LoginHandler, LogoutHandler
 from raceways.handlers.homepage import HomepageHandler
+from raceways.handlers.oauthhandler import OauthCallbackHandler
 from raceways.handlers.profile import ProfileHandler
 from raceways.handlers.update import UpdateHandler
 from raceways.handlers.activities import ActivitiesHandler
@@ -53,7 +54,9 @@ webapp2_config['webapp2_extras.sessions'] = {
 
 app = webapp2.WSGIApplication([
     ('/', HomepageHandler),
+    ('/oauth2callback', OauthCallbackHandler),
     ('/login', LoginHandler),
+    ('/logout', LogoutHandler),
     ('/profile', ProfileHandler),
     ('/api/update', UpdateHandler),
     ('/api/activities', ActivitiesHandler),
