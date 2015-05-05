@@ -166,7 +166,7 @@ class AuthRequestContext(object):
                 # code in OAuth2Credentials.refresh is too complicated
                 # to copy here right now
                 clean_http = httplib2.Http(memcache)
-                credentials.refresh(clean_http) # failure?
+                self.credentials.refresh(clean_http) # failure?
                 
             credentials.apply(headers)
             result = yield self._urlfetch(url, headers=headers, **kwds)
@@ -183,7 +183,9 @@ class BaseHandler(webapp2.RequestHandler):
             self.user = gitkit_instance.VerifyGitkitToken(self.request.cookies['gtoken'])
         
         if self.user:
-            self.strava_storage = StorageByKeyName(RacewaysUser, self.user.user_id, 'strava_credentials')
+            self.strava_storage = StorageByKeyName(RacewaysUser,
+                                                   self.user.user_id,
+                                                   'strava_credentials_new')
         # note that authorization has not happened yet
         self.strava = StravaClient(self.http)
 

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock%}
+{% block content %}
+<h1>Strava Raceways</h1>
+
+<div id="gitkitWidgetDiv"></div>
+<script type="text/javascript">
+  var config = {
+      apiKey: 'AIzaSyD374j2wz1s7BGXOVrAc5euck-mCF5BbTo',
+      signInSuccessUrl: 'https://strava-raceways.appspot.com/profile',
+      idps: ["google"],
+      oobActionUrl: 'https://strava-raceways.appspot.com/send_email',
+      siteName: 'this site'
+  };
+  // The HTTP POST body should be escaped by the server to prevent XSS
+  window.google.identitytoolkit.start(
+      '#gitkitWidgetDiv', // accepts any CSS selector
+      config,
+      'JAVASCRIPT_ESCAPED_POST_BODY');
+</script>
+{% endblock %}

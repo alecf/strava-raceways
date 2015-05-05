@@ -128,7 +128,7 @@ RenderContext.prototype.InterpolateNormal = function(start, points, color) {
         var nextZ = nextPoint[2];
         var nextPointVector = new THREE.Vector3(nextX, nextY, nextZ);
         nextPointVector.sub(start);
-        nextPointVector.multiplyScalar(3);
+        nextPointVector.multiplyScalar(10);
         nextPointVector.add(start);
 
         var pointerGeometry = new THREE.Geometry();
@@ -149,20 +149,11 @@ RenderContext.prototype.add_activities_to_scene = function(streamset) {
     console.log("Proximities mapping ", proximityRadius.domain(), " => ", proximityRadius.range());
 
     var totalspheres = 0;
-    var materials = {};
     RCV = this.view;
-
 
     var bucketStreams = this.view.allBucketStreams();
 
-
-    //console.log("Got bucketstreams: ", bucketStreams);
     bucketStreams.forEach(function(activitystream, index) {
-        // console.log("bucketstream ", index, " starts with ",
-        //              activitystream.slice(0,5)
-        //              .map(function(point) { return point[3].length; }));
-        // console.log("   activity has", this.view.streamset.activities_[index].stream.altitude.data.length, " total points");
-
         var geometry = new THREE.Geometry();
         var spherecount = 0;
         activitystream.forEach(function(point, i) {
@@ -175,14 +166,15 @@ RenderContext.prototype.add_activities_to_scene = function(streamset) {
             var pointVector = new THREE.Vector3(x, y, z);
             geometry.vertices.push(pointVector);
 
-            // var normalLine = this.InterpolateNormal(
-            //     pointVector,
-            //     activitystream.slice(i, i+1),
-            //     color(index));
+            var normalLine = this.InterpolateNormal(
+                pointVector,
+                activitystream.slice(i, i+1),
+                color(index));
+            this.scene.add(normalLine);
 
             // gad this is expensive
             var radius = proximityRadius(Object.keys(proximity).length);
-            if (false && radius >= 1) {
+            if (radius >= 1) {
                 spherecount++;
                 var sphere = this.getSphere(radius);
                 var material = this.getMaterial(color(index));
@@ -204,6 +196,191 @@ RenderContext.prototype.add_activities_to_scene = function(streamset) {
         this.scene.add(line);
     }, this);
     console.log("Total spheres: ", totalspheres);
+
+    this.add_point_planes_to_scene();
+};
+
+/**
+ * break a polygon up into a series of triangles, with 'center' at the
+ * center
+ *
+ * @param center The coordinates of the 'center' of the polygon
+ * @param polygon An array of coordinates.
+ * @param links An array of coordinates pairs [source, target] that start or end
+ *              at the center.
+ */
+function shatter(center, polygon, links) {
+    // TODO: find places where links cross polygon sides
+    var triangles = [];
+    for (var i = 0; i < polygon.length-1; i++) {
+        var point1 = polygon[i];
+        var point2 = polygon[i+1];
+        var found_cross = null;
+        for (var j = 0; j < links.length; j++) {
+            var link = links[j];
+            found_cross = cross_point([point1, point2],
+                                      [link.source, link.target]);
+            if (found_cross) {
+                break;
+            }
+        }
+
+        // XXX still losing elevation here.
+        // elevation at cross?
+        if (found_cross) {
+            triangles.push([center, polygon[i], found_cross]);
+            triangles.push([center, found_cross, polygon[i+1]]);
+        } else {
+            triangles.push([center, polygon[i], polygon[i+1]]);
+        }
+    }
+    triangles.push([center, polygon[i], polygon[0]]);
+    return triangles;
+}
+
+function equals2d(point1, point2) {
+    return (point1[0] == point2[0] &&
+            point1[1] == point2[1]);
+}
+
+/**
+ * Find the point where two lines cross, if any.
+ *
+ * @param line1 A pair of coordinates.
+ * @param line2 A pair of coordinates.
+ * @return A pair of coordinates, or null if they don't cross.
+ */
+function cross_point(line1, line2) {
+    // implementation borrowed from
+    // http://www.kevlindev.com/gui/math/intersection/Intersection.js
+    // More details:
+    // http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
+    var a1 = line1[0];
+    var a2 = line2[1];
+    var b1 = line2[0];
+    var b2 = line2[1];
+    var ua_t = (b2[0] - b1[0]) * (a1[1] - b1[1]) - (b2[1] - b1[1]) * (a1[0] - b1[0]);
+    var ub_t = (a2[0] - a1[0]) * (a1[1] - b1[1]) - (a2[1] - a1[1]) * (a1[0] - b1[0]);
+    var u_b  = (b2[1] - b1[1]) * (a2[0] - a1[0]) - (b2[0] - b1[0]) * (a2[1] - a1[1]);
+
+    if (u_b) {
+        var ua = ua_t / u_b;
+        var ub = ub_t / u_b;
+
+        return [a1[0] + ua * (a2[0] - a1[0]),
+                a1[1] + ua * (a2[1] - a1[1])];
+    } else {
+        if (!ua_t || !ub_t) {
+            // coincident
+        } else {
+            // parallel
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Adds planes for voroni polygons.
+ *
+ * Initially, just adds each plane elevated up to the elevation of the point itself.
+ *
+ * Eventually we'll find all the paths in and out of each coordinate, and adjust the
+ */
+RenderContext.prototype.add_point_planes_to_scene = function() {
+    var color = d3.scale.ordinal().range(colorbrewer.Set3[12]);
+    var voronoi = d3.geom.voronoi()
+            .clipExtent([[0,0], [this.view.width, this.view.height]]);
+
+    var coordinates = this.view.allBucketCoordinates();
+
+    var polygons = voronoi(coordinates);
+
+    // rejoin x,y with the z and other points from the coordinates
+    polygons = polygons.map(function(polygon, i) {
+        return polygon.map(function(point) {
+            return [point[0], point[1]].concat(coordinates[i].slice(2));
+        });
+    });
+
+    // Note that these are all links, not necessarily just links seen
+    // by known paths from the data.
+    var links = voronoi.links(coordinates);
+    //console.log("Got links: ", links);
+
+    // console.log("Got 3d polygons: ", polygons);
+    //
+    // index all the links by their source and target, so that we can
+    // iterate the polygons and find what links come out of them
+
+    var links_by_coordinates = {};
+    function node_key(coord) {
+        return coord.slice(0,2).join('\n');
+    }
+    function add_node_link(node, link) {
+        var key = node_key(node);
+        if (!(key in links_by_coordinates)) {
+            links_by_coordinates[key] = [];
+        }
+        links_by_coordinates[key].push(link);
+    }
+    links.forEach(function(link) {
+        add_node_link(link.source, link);
+        add_node_link(link.target, link);
+    });
+
+    // console.log("Indexed links: ", links_by_coordinates);
+
+    // links out of each coordinate
+    var links_out = coordinates
+            .map(function(coordinate) {
+                return links_by_coordinates[node_key(coordinate)];
+            });
+    // console.log("Now have links out: ", links_out);
+    var showPolygons = true;
+    var showTriangles = false;
+
+    var shapes = [];
+    var triangles = [];
+    polygons.forEach(function(polygon, i) {
+        var links = links_by_coordinates[node_key(coordinates[i])];
+        var shattered = shatter(coordinates[i], polygon, links_out[i]);
+
+        shattered.forEach(function(triangle) {
+            triangles.push(triangle);
+        });
+
+        if (showPolygons) {
+            var points = polygon.map(function(point) {
+             return new THREE.Vector3(point[0], point[1], point[2]);
+            });
+            var polygonPathShape = new THREE.Shape(points);
+            var polygonGeo = new THREE.ShapeGeometry(polygonPathShape);
+            // This makes some pretty neat stair-stepping
+            //var polygonGeo = polygonPathShape.extrude({amount:polygon[0][2]});
+            shapes.push(polygonPathShape);
+            var material = this.getMaterial(color(i));
+
+            var mesh = new THREE.Mesh(polygonGeo, material);
+            // Shapes are 2d, so they also have to be repositioned.
+            mesh.position.set(0,0,polygon[0][2]);
+            this.scene.add(mesh);
+        }
+
+        if (showTriangles) {
+            shattered.forEach(function(triangle, j) {
+                var tshape = new THREE.Triangle(
+                    new THREE.Vector3(triangle[0][0], triangle[0][1], polygon[0][2]),
+                    new THREE.Vector3(triangle[1][0], triangle[1][1], polygon[0][2]),
+                    new THREE.Vector3(triangle[2][0], triangle[2][1], polygon[0][2]));
+                var material = this.getMaterial(color(j));
+                var mesh = new THREE.Mesh(tshape, material);
+                this.scene.add(mesh);
+            }, this);
+        }
+    }, this);
+    // console.log("Created geometries: ", shapes);
+    // console.log("With extra triangles: ", triangles);
 };
 
 RenderContext.prototype.add_backing_plane = function() {
@@ -320,7 +497,7 @@ RenderContext2d.prototype.updatescene = function() {
     this.ctx.fillStyle = '#fff';
     this.ctx.fillRect(0, 0, rect.width, rect.height);
 
-    //this.draw_gridlines();
+    this.draw_gridlines();
     this.draw_background();
 
     //this.draw_activities();
@@ -382,6 +559,9 @@ RenderContext2d.prototype.draw_simplified_activities = function() {
  */
 RenderContext2d.prototype.draw_background = function() {
     this.ctx.save();
+    console.log("2d draw background ", this.view.width, this.view.height);
+    if (!this.view.width || !this.view.height)
+        return;
     // make some vornoi!
     var voronoi = d3.geom.voronoi()
             .clipExtent([[0,0], [this.view.width, this.view.height]]);
@@ -424,7 +604,7 @@ RenderContext2d.prototype.draw_gridlines = function() {
     this.ctx.save();
     this.ctx.lineWidth = 0.5;
     this.ctx.strokeStyle = '#eee';
-    var lpat_range = this.streamset.bucket_lat.range();
+    var lat_range = this.streamset.bucket_lat.range();
     var lng_range = this.streamset.bucket_lng.range();
     var lng_start = this.streamset.bucket_lng.invert(lng_range[0]);
     var lng_end = this.streamset.bucket_lng.invert(lng_range[1]);

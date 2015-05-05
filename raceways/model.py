@@ -4,6 +4,7 @@ from oauth2client.appengine import CredentialsNDBProperty
 
 class RacewaysUser(ndb.Model):
     strava_credentials = CredentialsNDBProperty()
+    strava_credentials_new = CredentialsNDBProperty()
 
 class Athlete(ndb.Model):
     resource_state = ndb.IntegerProperty()

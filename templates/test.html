@@ -8,12 +8,15 @@
     Jump straight to the <a href="profile">profile</a>.
     <div>
     User credentials:
-    <ul>
-        <li>Nickname: {{user.nickname()}}</li>
-        <li>Email: {{user.email()}}</li>
-        <li>userid: {{user.user_id()}}</li>
-        <li>federated: {{user.federated_identity()}}</li>
-        <li>federated provider: {{user.federated_provider()}}</li>
+        <ul>
+        <li>Email: {{user.email}}</li>
+        <li>Verified: {{user.email_verified}}</li>
+        <li>userid: {{user.user_id}}</li>
+        <li>provider: {{user.provider_id}}</li>
+        <li>provider inf: {{user.provider_info}}</li>
+        <li>salt: {{user.salt}}</li>
+        <li>photo: {{user.photo_url}}</li>
+        <li>name: {{user.name}}</li>
     </ul>
     You can <a href="{{logout_url}}">Log out</a> at any time.
     </div>
@@ -27,6 +30,15 @@
     {% endif %}
 </div>
 {% else %}
-<a href="{{login_url}}">Log in to Google</a> to begin.
 {% endif %}
+<div id="signin"></div>
+<script type=text/javascript>
+  window.google.identitytoolkit.signInButton(
+    '#signin', // accepts any CSS selector
+    {
+      widgetUrl: window.location.origin + "/oauth2callback",
+      signOutUrl: window.location.origin + "/logout",
+    }
+  );
+</script>
 {% endblock %}

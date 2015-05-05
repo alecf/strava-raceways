@@ -4,6 +4,12 @@
 // requires d3.js and lodash
 StreamSet = (function() {
 
+  function accessor(attr) {
+    return function(d, i) {
+      return d[attr];
+    };
+  }
+
   /**
    * Create a new streamset
    *
@@ -89,10 +95,13 @@ StreamSet = (function() {
     return this.ready_;
   };
 
+  /**
+   * Join a list of features
+   */
   function join_geojsons(geojsons) {
     return {
       type: 'FeatureCollection',
-      features: geojsons,
+      features: geojsons.filter(function(data) { return !!data }),
     };
   }
 
@@ -102,11 +111,7 @@ StreamSet = (function() {
   StreamSet.prototype.consume_index = function(stream_indexes) {
 
     this.features = join_geojsons(stream_indexes
-                                  .filter(function(metadata) {
-                                    return metadata.geojson; })
-                                  .map(function(metadata) {
-                                    return metadata.geojson;
-                                  }));
+                                  .map(accessor('geojson')));
 
     var extents = this.extents_ = {
       min_lat: d3.min(stream_indexes, function(d) {
@@ -226,12 +231,6 @@ StreamSet = (function() {
     // each bucket
     this.bucketCount_ = bucketCount;
   };
-
-  function accessor(attr) {
-    return function(d, i) {
-      return d[attr];
-    };
-  }
 
   // generate metadata about all the streams
   function index_streams(activities) {
@@ -507,8 +506,18 @@ StreamSetView = (function() {
   };
 
   StreamSetView.prototype.allBucketCoordinates = function() {
+    var scale_x = this.scale_x;
+    var scale_y = this.scale_y;
+    var scale_z = this.scale_z;
+    var projection = this.projection;
     var bucketCoordinates = this.streamset.allBucketCoordinates();
-    return bucketCoordinates.map(this.projection);
+    return bucketCoordinates.map(projection)
+      .map(function(point, i) {
+        return [scale_x(point[0]),
+                scale_y(point[1]),
+                scale_z(bucketCoordinates[i][2])]
+          .concat(bucketCoordinates[i].slice(3));
+      });
   };
 
   StreamSetView.prototype.allBucketStreams = function() {
@@ -523,8 +532,8 @@ StreamSetView = (function() {
                   scale_y(bucket[1]),
                   // copy over altitude and proximity data from
                   // original stream
-                  scale_z(stream[index][2]),
-                  stream[index][3]];
+                  scale_z(stream[index][2])]
+            .concat(stream[index].slice(3));
         }, this);
     }, this);
   };

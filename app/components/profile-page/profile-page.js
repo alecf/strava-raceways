@@ -10,6 +10,15 @@ Polymer('profile-page', {
     },
     ready: function() {
         console.log("profile-page ready");
+        if (window.google && window.google.identitytoolkit) {
+            window.google.identitytoolkit.signInButton(
+                this.$.signin, // accepts any CSS selector
+                {
+                    widgetUrl: window.location.origin + "/oauth2callback",
+                    signOutUrl: window.location.origin + "/logout",
+                }
+            );
+        }
 
         var querystring = window.location.search.slice(1).split('&');
         var params = _(querystring)
@@ -19,6 +28,7 @@ Polymer('profile-page', {
         this.resolution = params.resolution || this.resolution;
         this.profile = new Profile(this, this.resolution);
         this.profile.init();
+
     },
     onRefresh: function() {
         if (this.$.refreshAjax.loading) return;
