@@ -13,7 +13,7 @@ from identitytoolkit import gitkitclient
 
 # for async context
 from google.appengine.ext import ndb
-
+from webapp2_extras.securecookie import SecureCookieSerializer
 
 from google.appengine.api import users, memcache
 from oauth2client.appengine import StorageByKeyName
@@ -32,6 +32,8 @@ STRAVA_SECRETS = os.path.join(os.path.dirname(os.path.dirname(__file__)),
 gitkit_instance = gitkitclient.GitkitClient.FromConfigFile(
     os.path.join(os.path.dirname(os.path.dirname(__file__)),
                  "gitkit-server-config.json"))
+
+COOKIEMAKER = SecureCookieSerializer('abcd')
 
 class NoStravaUser(BaseException):
     pass
@@ -92,11 +94,31 @@ def api_handler(f):
         
     return wrapper
 
+def ValidateCookie(request, response):
+    securetoken = request.cookies['atoken']
+    userstring = COOKIEMAKER.deserialize('atoken', securetoken)
+    if not userstring:
+        self.request.unset_cookie('atoken')
+        return
+
+    return gitkitclient.GitkitUser.FromDictionary(json.loads(userstring))
+
+def SetUserCookie(response, user):
+    cookieval = COOKIEMAKER.serialize('atoken', json.dumps(user.ToRequest()))
+
+    response.set_cookie('atoken', cookieval)
+
 def authorized(f):
     @wraps(f)
     def wrapper(self, *args, **kwds):
-        if 'gtoken' in self.request.cookies:
+
+        if 'atoken' in self.request.cookies:
+            self.user = ValidateCookie(self.request, self.response)
+            
+        elif 'gtoken' in self.request.cookies:
             self.user = gitkit_instance.VerifyGitkitToken(self.request.cookies['gtoken'])
+            if self.user:
+                SetUserCookie(self.response, self.user)
         if not self.user or not self.strava_storage.get():
             print "Redirecting..."
             return self.redirect('/')
@@ -179,9 +201,13 @@ class BaseHandler(webapp2.RequestHandler):
         self.http = httplib2.Http(memcache)
         
         self.user = None
-        if 'gtoken' in self.request.cookies:
-            self.user = gitkit_instance.VerifyGitkitToken(self.request.cookies['gtoken'])
+        if 'atoken' in self.request.cookies:
+            self.user = ValidateCookie(self.request, self.response)
         
+        elif 'gtoken' in self.request.cookies:
+            self.user = gitkit_instance.VerifyGitkitToken(self.request.cookies['gtoken'])
+            if self.user:
+                SetUserCookie(self.response, self.user)
         if self.user:
             self.strava_storage = StorageByKeyName(RacewaysUser,
                                                    self.user.user_id,
